@@ -73,7 +73,7 @@ theme_update(panel.background = element_rect(colour = "black"),
              axis.text = element_text(colour = "black"))
 
 setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
-
+load('.RData')
 
 
 
@@ -548,6 +548,8 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
+
+
 ggplot(met.clean,aes(x=SGroup,y=Conc,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
   stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
@@ -564,6 +566,41 @@ ggplot(met.clean,aes(x=SGroup,y=Conc,color=Metformin_mM))+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Raw_Conc_by_metabolite.pdf",sep=''),
              width=15,height=80, useDingbats=FALSE)
+
+
+
+#Histograms
+ggplot(met.clean,aes(x=Conc_log))+
+  ggtitle('Distribution of log2 Concentration, pmol/ODmL')+
+  geom_density(aes(y=..scaled..),fill='red',alpha=0.5)+
+  geom_rug(color='red')+
+  scale_x_continuous(breaks=seq(-20,20,by=1))+
+  ylab('Scaled density')+
+  xlab('log2 Concentration, pmol/ODmL')+
+  facet_wrap(~Metabolite,ncol = 4,scales='free_x')
+
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Density_logConc_by_metabolite.pdf",sep=''),
+             width=15,height=80, useDingbats=FALSE)
+
+
+
+ggplot(met.clean,aes(x=Conc))+
+  ggtitle('Distribution of Concentration, pmol/ODmL')+
+  geom_density(aes(y=..scaled..),fill='red',alpha=0.5)+
+  geom_rug(color='red')+
+  ylab('Scaled density')+
+  xlab('Concentration, pmol/ODmL')+
+  facet_wrap(~Metabolite,ncol = 4,scales='free_x')
+
+#aes(y=..scaled..),
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Density_Conc_by_metabolite.pdf",sep=''),
+             width=15,height=80, useDingbats=FALSE)
+
+
 
 
 
