@@ -72,7 +72,7 @@ theme_update(panel.background = element_rect(colour = "black"),
              axis.text = element_text(colour = "black"))
 
 setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
-load('.RData')
+#load('.RData')
 
 
 
@@ -116,6 +116,57 @@ met.info<-read.xlsx2('HMT_Ecoli_complete/Raw_data.xlsx',sheetName='Samples',
                      header=TRUE,check.names=FALSE)
 
 
+
+met.TCA<-read.xlsx2('HMT_Ecoli_complete/Raw_data.xlsx',sheetName='TCA',
+                     header=TRUE,check.names=FALSE)
+
+
+#library(broom)
+
+
+lmfill<-function(data,formula) {
+  model<-lm(as.formula(formula),data=data)
+  data$Prediction<-predict(model,data)
+  return(data)
+}
+
+
+
+
+#Calculate fill concentrations from supplement data
+met.TCAf<-met.TCA %>%
+  rename(Metabolite=`Compound name`) %>%
+  filter(Metabolite!="Isocitric acid") %>%
+  gather(Sample_ID,Value,`OP50-1-C`:`CRP-OE-3-100`) %>%
+  mutate(Value=as.numeric(Value),
+         Metabolite=as.character(Metabolite),
+         Metabolite=str_replace(Metabolite,"Malonyl CoA","Malonyl-CoA") ) %>%
+  spread(ID,Value) %>%
+  group_by(Metabolite) %>%
+  do(lmfill(.,"Conc ~ RelArea"))
+
+met.TCAf %>%
+  filter(Prediction<0 ) 
+
+met.TCAf %>%
+  filter(Prediction>0 & is.na(Conc) )
+
+#Plot supplement TCA cycle predictions
+met.TCAf %>%
+  gather(Measure,Value,Conc,Prediction) %>%
+  ggplot(aes(x=RelArea,y=Value,color=Measure,shape=Measure))+
+  geom_hline(yintercept = 0,color='red',alpha=0.5)+
+  geom_point()+
+  geom_line()+
+  facet_wrap(~Metabolite,scale='free') 
+
+
+met.TCAp<-met.TCAf %>%
+  filter(Prediction>0 & is.na(Conc))%>%
+  select(-Conc,-RelArea)
+
+met.TCAp
+
 grporder<-c("C_0_N","C_50_N",
             "C_0_G","C_50_G",
             "CRP_0_N","CRP_50_N",
@@ -127,24 +178,33 @@ spl.order<-c('None','Glucose','IPTG50','IPTG100')
 sgrp.order<-c('OP50 None','OP50 Glucose','CRP None','OP50 IPTG50','oeCRP IPTG50','oeCRP IPTG100')
 
 met.all<-met.raw %>%
-  gather(Sample_ID,Conc,`OP50-1-C`:`CRP-OE-3-100`) %>%
-  left_join(met.info) %>%
-  mutate(Conc_log=log2(Conc),
-         SGroup=paste(Strain,Supplement),
-         Group=factor(Group,levels=grporder,labels=grporder),
-         Strain=factor(Strain,levels=strn.order,labels=strn.order),
-         Supplement=factor(Supplement,levels=spl.order,labels=spl.order),
-         SGroup=factor(SGroup,levels=sgrp.order,labels=sgrp.order)) %>%
   rename(Metabolite=`Pathway Label`,
          Metabolite_full=`Compound name`,
          KEGG_ID=`KEGG ID`,
          HMDB_ID=`HMDB ID`) %>%
-  select(Sample_ID,Replicate:Amount_ODmL,Metabolite_ID:HMDB_ID,everything())
+  gather(Sample_ID,Conc,`OP50-1-C`:`CRP-OE-3-100`) %>%
+  left_join(met.info) %>%
+  left_join(met.TCAp,by=c('Sample_ID','Metabolite')) %>%
+  mutate(Conc=ifelse(is.na(Conc) & !is.na(Prediction),Prediction,Conc),
+         Conc_log=log2(Conc),
+         SGroup=paste(Strain,Supplement),
+         SGroup=factor(SGroup,levels=sgrp.order,labels=sgrp.order),
+         Group=factor(Group,levels=grporder,labels=grporder),
+         Strain=factor(Strain,levels=strn.order,labels=strn.order),
+         Supplement=factor(Supplement,levels=spl.order,labels=spl.order) ) %>%
+  select(Sample_ID,Replicate:Group,SGroup,Strain:Amount_ODmL,Metabolite_ID:HMDB_ID,everything(),-Prediction)
   
 head(met.all)
 
 
-write.csv(met.all,paste(odir,'/Raw_data.csv',sep=''),row.names = FALSE)
+
+#grepl('CoA',Metabolite)
+
+met.all %>%
+  filter(!is.na(Prediction))
+
+
+write.csv(met.all,paste(odir,'/Raw_data_filled.csv',sep=''),row.names = FALSE)
 
 
 met.clean<-met.all %>%
@@ -212,11 +272,81 @@ write.csv(missing.obs,paste(odir,'/Missing_observations.csv',sep=''),row.names =
 rm.mets<-missing.obs %>%
   filter(Missing_total>25)
 
+#Remove metabolites that are missing
 met.sel<-met.clean %>%
   filter(!Metabolite %in% rm.mets$Metabolite)
 
 
 glimpse(met.sel)
+
+
+
+
+#PCA plots
+
+PCAplot<-function(metslm) {
+  allmiss.cols<-apply(metslm, 2, function(x) all(is.na(x)))
+  metslm[,allmiss.cols]
+  
+  anymiss.cols<-apply(metslm, 2, function(x) any(is.na(x)))
+  anymiss.rows<-apply(metslm, 1, function(x) any(is.na(x)))
+  
+  # metslm[,anymiss.cols]
+  # metslm[anymiss.rows,]
+  
+  missing.cols<-names(anymiss.cols[anymiss.cols==TRUE])
+  missing.rows<-rownames(metslm)[anymiss.rows==TRUE]
+  
+  print(missing.cols)
+  print(missing.rows)
+  
+  pca.dat<-metslm %>%
+    select(- (Group:Supplement))
+  
+  ir.pca <- prcomp(pca.dat,
+                   center = TRUE,
+                   scale. = TRUE) 
+  #plot(ir.pca,type='l')
+  
+  pcadata<-data.frame(ir.pca$x)
+  pcadata[,c('ID','Group','SGroup','Strain','Metformin_mM','Supplement')]<-metslm[,c('ID','Group','SGroup','Strain','Metformin_mM','Supplement')]
+  
+  pcaresult<-summary(ir.pca)$importance
+  PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
+  PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
+  
+  ellipses<-pcadata %>%
+    group_by(Strain,Group,SGroup,Metformin_mM,Supplement) %>%
+    do(getellipse(.$PC1,.$PC2,1))
+  
+  ggplot(pcadata,aes(x=PC1,y=PC2,colour=SGroup))+
+    xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
+    ylab(paste('PC2 - ',PC2prc,'% of variance',sep=''))+
+    geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),linetype=Metformin_mM),size=1)+ 
+    geom_point(aes(fill=factor( ifelse(Metformin_mM==0,SGroup, NA ) ) ),size=5,stroke=1,shape=21)+
+    scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
+    scale_fill_discrete(na.value=NA, guide="none")+
+    guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
+    geom_text_repel(aes(label=ID),size=2,color='black')+
+    labs(colour='Strain & Supplement')+
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+}
+
+
+
+PCAdata<-function(data) {
+  lmdata<-data %>%
+    group_by(Metabolite) %>%
+    mutate(Filling_missing=any(is.na(Filled_conc_log))) %>%
+    ungroup %>%
+    filter(!Filling_missing) %>%
+    select(Group,SGroup,ID,Strain,Metformin_mM,Supplement,Metabolite,Filled_conc_log) %>%
+    spread(Metabolite,Filled_conc_log)
+  return(lmdata)
+}
+
+
 
 #Original - Full of holes... HMT linear scale
 metslm<-met.sel %>%
@@ -227,149 +357,31 @@ metslm<-met.sel %>%
   select(Group,SGroup,ID,Strain,Metformin_mM,Supplement,Metabolite,Filled_conc) %>%
   spread(Metabolite,Filled_conc)
 
-
-#Vanilla filled - All
-metslm<-met.sel %>%
-  group_by(Metabolite) %>%
-  mutate(Filling_missing=any(is.na(Filled_conc_log))) %>%
-  ungroup %>%
-  filter(!Filling_missing) %>%
-  select(Group,SGroup,ID,Strain,Metformin_mM,Supplement,Metabolite,Filled_conc_log) %>%
-  spread(Metabolite,Filled_conc_log)
-
-
-
-#No IPTG, oe filled
-metslm<-met.sel %>%
-  filter(!Group %in% c("C_0_I50","oeCRP_0_I50","oeCRP_0_I100")) %>%
-  group_by(Metabolite) %>%
-  mutate(Filling_missing=any(is.na(Filled_conc_log))) %>%
-  ungroup %>%
-  filter(!Filling_missing) %>%
-  select(Group,SGroup,ID,Strain,Metformin_mM,Supplement,Metabolite,Filled_conc_log) %>%
-  spread(Metabolite,Filled_conc_log)
-
-
-#Control, IPTG, oe filled
-metslm<-met.sel %>%
-  filter(Group %in% c("C_0_N","C_50_N","C_0_I50","oeCRP_0_I50","oeCRP_0_I100")) %>%
-  group_by(Metabolite) %>%
-  mutate(Filling_missing=any(is.na(Filled_conc_log))) %>%
-  ungroup %>%
-  filter(!Filling_missing) %>%
-  select(Group,SGroup,ID,Strain,Metformin_mM,Supplement,Metabolite,Filled_conc_log) %>%
-  spread(Metabolite,Filled_conc_log)
-
-
-
-#No Glucose
-metslm<-met.sel %>%
-  filter(!Supplement=='Glucose') %>%
-  group_by(Metabolite) %>%
-  mutate(Filling_missing=any(is.na(Filled_conc_log))) %>%
-  ungroup %>%
-  filter(!Filling_missing) %>%
-  select(Group,SGroup,ID,Strain,Metformin_mM,Supplement,Metabolite,Filled_conc_log) %>%
-  spread(Metabolite,Filled_conc_log)
-
-
-#What Filipe asked
-metslm<-met.sel %>%
-  filter(!Supplement=='Glucose' & Strain %in% c('OP50','CRP')) %>%
-  group_by(Metabolite) %>%
-  mutate(Filling_missing=any(is.na(Filled_conc_log))) %>%
-  ungroup %>%
-  filter(!Filling_missing) %>%
-  select(Group,SGroup,ID,Strain,Metformin_mM,Supplement,Metabolite,Filled_conc_log) %>%
-  spread(Metabolite,Filled_conc_log)
-
-
-dim(metslm)
-View(metslm)
-
-
-
-
-#Find compounds with missing values
-
-
-#All missing valus for compound
-allmiss.cols<-apply(metslm, 2, function(x) all(is.na(x)))
-metslm[,allmiss.cols]
-
-
-anymiss.cols<-apply(metslm, 2, function(x) any(is.na(x)))
-anymiss.rows<-apply(metslm, 1, function(x) any(is.na(x)))
-
-
-metslm[,anymiss.cols]
-metslm[anymiss.rows,]
-
-missing.cols<-names(anymiss.cols[anymiss.cols==TRUE])
-missing.rows<-rownames(metslm)[anymiss.rows==TRUE]
-
-missing.cols
-missing.rows
-
-
-
-
-pca.dat<-metslm %>%
-  select(- (Group:Supplement))
-
-
-
-ir.pca <- prcomp(pca.dat,
-                 center = TRUE,
-                 scale. = TRUE) 
-plot(ir.pca,type='l')
-
-pcadata<-data.frame(ir.pca$x)
-pcadata[,c('ID','Group','SGroup','Strain','Metformin_mM','Supplement')]<-metslm[,c('ID','Group','SGroup','Strain','Metformin_mM','Supplement')]
-
-
-pcaresult<-summary(ir.pca)$importance
-PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
-PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
-
-
-ellipses<-pcadata %>%
-  group_by(Strain,Group,SGroup,Metformin_mM,Supplement) %>%
-  do(getellipse(.$PC1,.$PC2,1))
-
-
-ggplot(pcadata,aes(x=PC1,y=PC2,colour=SGroup))+
-  xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
-  ylab(paste('PC2 - ',PC2prc,'% of variance',sep=''))+
-  geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),linetype=Metformin_mM),size=1)+ 
-  geom_point(aes(fill=factor( ifelse(Metformin_mM==0,SGroup, NA ) ) ),size=5,stroke=1,shape=21)+
-  scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
-  scale_fill_discrete(na.value=NA, guide="none")+
-  guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
-  geom_text_repel(aes(label=ID),size=2,color='black')+
-  labs(colour='Strain & Supplement')+
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_NoGlucose.pdf",sep=''),
-             width=12,height=9)
-
+metslm %>%
+  PCAplot
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/PCA_All_HMT_linear_scale.pdf",sep=''),
              width=12,height=9)
 
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_WhatFilipeAsked.pdf",sep=''),
-             width=12,height=9)
 
+#Vanilla filled - All
+met.sel %>%
+  PCAdata %>%
+  PCAplot
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/PCA_All.pdf",sep=''),
              width=12,height=9)
+
+
+
+#No IPTG, oe filled
+met.sel %>%
+  filter(!Group %in% c("C_0_I50","oeCRP_0_I50","oeCRP_0_I100")) %>%
+  PCAdata %>%
+  PCAplot
 
 
 dev.copy2pdf(device=cairo_pdf,
@@ -377,9 +389,43 @@ dev.copy2pdf(device=cairo_pdf,
              width=12,height=9)
 
 
+#Control, IPTG, oe filled
+met.sel %>%
+  filter(Group %in% c("C_0_N","C_50_N","C_0_I50","oeCRP_0_I50","oeCRP_0_I100")) %>%
+  PCAdata %>%
+  PCAplot
+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/PCA_IPTG_oe.pdf",sep=''),
              width=12,height=9)
+
+
+#No Glucose
+met.sel %>%
+  filter(!Supplement=='Glucose') %>%
+  PCAdata %>%
+  PCAplot
+
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/PCA_NoGlucose.pdf",sep=''),
+             width=12,height=9)
+
+
+#What Filipe asked
+met.sel %>%
+  filter(!Supplement=='Glucose' & Strain %in% c('OP50','CRP')) %>%
+  PCAdata %>%
+  PCAplot
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/PCA_WhatFilipeAsked.pdf",sep=''),
+             width=12,height=9)
+
+
+dim(metslm)
+View(metslm)
+
 
 
 
@@ -492,25 +538,27 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-
-ggplot(met.clean,aes(x=SGroup,y=Conc_log,color=Metformin_mM))+
-  ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
+met.clean %>%
+  #filter(Metabolite %in% c('Malonyl-CoA','Fumaric acid','Malic acid')) %>%
+  ggplot(aes(x=SGroup,y=Conc_log,color=Metformin_mM))+
   stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
   geom_point()+
   scale_y_continuous(breaks=seq(-20,20,by=1))+
   geom_text(aes(label=Replicate),color='black',size=2)+
   ylab('log2 Concentration, pmol/ODmL')+
   xlab('Group & Supplement')+
+  labs(color='Metformin, mM')+
+  ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
   theme(axis.text.x=element_text(angle=90,hjust=1))+
   facet_wrap(~Metabolite,ncol = 4,scales='free_y')
-
-#,labeller = labeller(Metablite = label_both)
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Raw_logConc_by_metabolite.pdf",sep=''),
              width=15,height=80, useDingbats=FALSE)
 
-
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Raw_logConc_by_metabolite_TCA.pdf",sep=''),
+             width=12,height=6, useDingbats=FALSE)
 
 
 
@@ -524,8 +572,6 @@ ggplot(met.clean,aes(x=SGroup,y=Conc,color=Metformin_mM))+
   xlab('Group & Supplement')+
   theme(axis.text.x=element_text(angle=90,hjust=1))+
   facet_wrap(~Metabolite,ncol = 4,scales='free_y')
-
-#,labeller = labeller(Metablite = label_both)
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Raw_Conc_by_metabolite.pdf",sep=''),
@@ -569,11 +615,7 @@ dev.copy2pdf(device=cairo_pdf,
              width=15,height=80, useDingbats=FALSE)
 
 
-
-
-
-
-#Summarise manually
+#Summarise variance
 
 sum.c<-met.clean %>%
   group_by(Metabolite,Group,Strain,Metformin_mM,Supplement) %>%
@@ -603,29 +645,17 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-#Metabolite summary
-met.c<-met.clean %>%
-  group_by(Metabolite) %>%
-  summarise_at(vars(Conc,Conc_log),funs(SD=sd(.,na.rm = TRUE),Mean=mean(.,na.rm = TRUE)))
-  
+# #Metabolite summary
+# met.c<-met.clean %>%
+#   group_by(Metabolite) %>%
+#   summarise_at(vars(Conc,Conc_log),funs(SD=sd(.,na.rm = TRUE),Mean=mean(.,na.rm = TRUE)))
+#   
 
 #Linear modelling
 
 
 head(met.clean)
 
-
-
-
-complete<-met.clean %>%
-  filter(!Supplement %in% c('IPTG50','IPTG100')) %>%
-  group_by(Metabolite_ID,Metabolite,Group) %>%
-  summarise(Complete=sum(!is.na(Conc_log))>0 ) %>%
-  spread(Group,Complete) %>%
-  mutate(Complete=all(C_0_N:CRP_50_N))
-
-complete %>% 
-  filter(Metabolite %in% c('2-KIV','') )
 
 
 all.groups<-as.character(unique(met.clean$Group))
@@ -642,41 +672,150 @@ contr.matrix<-contrasts$Contrasts.matrix
 strainlist<-c('OP50','CRP','oeCRP')
 
 contrasts.table$Strain<-factor(contrasts.table$Strain,levels=strainlist,labels=strainlist) #
+
+contr.matrix
 contr.matrix
 
-
-LA<-met.clean%>%
-  filter(Metabolite=='Lactic acid') %>%
-  group_by(Group) %>%
-  summarise(Observations=sum(!is.na(Conc_log))) %>%
-  data.frame
+unique(met.clean$Metabolite)
 
 
-#New testing routine
-contr.matrix %>%
-  data.frame %>%
-  rownames_to_column("Contrast") %>%
-  gather(Group,Value,C_0_N:oeCRP_0_I100) %>%
-  left_join(LA) %>%
-  group_by(Contrast) %>%
   
 
+hypothesise3<-function(lmdata,formula,cont.matrix,weights.col=NA) {
+  
+  # if(!is.na(variable)) {
+  #   print(unique(lmdata[,variable])[1])
+  #   #print(unique(as.character(lmdata[,variable])))
+  # }
+  # grps<-as.character(formula)[3]
+  # valvar<-as.character(formula)[2]
+  # grpcol<-gsub("0|\\+| ","",grps)
+  grps<-unlist(strsplit(formula,'~'))[2]
+  valvar<-unlist(strsplit(formula,'~'))[1]
+  grpcol<-gsub("0\\+","",grps)
+  
+  #print(grpcol)
+  
+  Obs<-lmdata%>%
+    group_by_(grpcol) %>%
+    summarise_(.dots = setNames(paste0("sum(!is.na(",valvar,"))"), 'Observations')) %>%
+    data.frame
+  
+  #New testing routine
+  cont.usable<-contr.matrix %>%
+    data.frame %>%
+    rownames_to_column("Contrast") %>%
+    gather(Group,Value,everything(),-Contrast) %>%
+    left_join(Obs,by=(grpcol)) %>%
+    mutate(Complete=(Value!=0 & Observations>0) | Value==0) %>%
+    group_by(Contrast) %>%
+    mutate(Usable_Contrast=all(Complete)) %>%
+    ungroup %>%
+    filter(Usable_Contrast)
+  
+  if(dim(cont.usable)[1]==0){
+    print('No comparisons to make!')
+    return(data.frame())
+  }
+  
+  cont.matrix.clean<-cont.usable%>%
+    group_by(Group) %>%
+    mutate(Used=any(Value!=0)) %>%
+    ungroup %>%
+    filter(Used) %>%
+    select(Contrast,Group,Value) %>%
+    spread(Group,Value) %>%
+    data.frame
+  
+  rownames(cont.matrix.clean)<-cont.matrix.clean$Contrast
+  cont.matrix.clean$Contrast<-NULL
+  
+  cont.matrix.clean<-as.matrix(cont.matrix.clean)
+  
+  print(cont.matrix.clean)
+  
+  if ('m' %in% colnames(cont.matrix.clean)){
+    #print('H0 values found!')
+    mval<-TRUE
+    groups.clean<-base::setdiff(colnames(cont.matrix.clean),'m')
+  } else {
+    mval<-FALSE
+    groups.clean<-colnames(cont.matrix.clean)
+  }
+  
+  print(groups.clean)
+  print(colnames(cont.matrix.clean))
+  print(rownames(cont.matrix.clean))
+  
+  lmdata<-lmdata%>%
+    filter_(paste0(grpcol,"%in% groups.clean")) %>%
+    mutate_(paste0(grpcol,"=factor(",grpcol,",levels=groups.clean,labels=groups.clean)"))
+  
+  
+  if(!is.null(dim(weights.col))){
+    model<-lm(formula, data=lmdata, weights=weights.col)
+  } else{
+    model<-lm(formula, data=lmdata)
+  }
+  
+  print(cont.matrix.clean[,c(groups.clean),drop=FALSE])
+  
+  if (mval==TRUE) {
+    lmod_glht <- multcomp::glht(model, linfct = cont.matrix.clean[,c(groups.clean),drop=FALSE],rhs=cont.matrix.clean[,'m'])
+  } else {
+    lmod_glht <- multcomp::glht(model, linfct = cont.matrix.clean[,c(groups.clean),drop=FALSE])
+  }
+  
+  result<-multcomp:::summary.glht(lmod_glht,test=multcomp::adjusted("none"))
+  res<-plyr::ldply(result$test[c('coefficients','sigma','tstat','pvalues')])
+  
+  
+  allresults<-res %>%
+    gather(Contrast,Value,-`.id`) %>%
+    spread(`.id`,Value) %>%
+    rename(logFC=coefficients,SE=sigma,p.value=pvalues,t.value=tstat)
+  
+  #m adjustment
+  if (mval==TRUE){
+    allresults<-allresults %>%
+      left_join(data.frame(cont.matrix.clean[,c('m'),drop=FALSE]) %>% mutate(Contrast=rownames(cont.matrix.clean)), by='Contrast') %>%
+      mutate(logFC=logFC-m,
+             m=NULL)
+  }
+  
+  return(allresults)
+}
+
+
+
+
+
+grpcol<-'Group'
+valvar<-'Conc_log'
+
+lmdata<-met.clean%>%
+  filter(Metabolite=='Creatine') 
 
 
 
 
 
 #New linear modelling pipeline
+#odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
+
+#contr.matrix[,'m']<-1
 
 lmdata<-met.clean %>%
+  filter(Metabolite=='Gly') %>%
+  filter(Supplement!='Glucose') %>%
   group_by(Metabolite,Metabolite_ID,Metabolite_full,KEGG_ID,HMDB_ID) %>%
-  do(hypothesise2(.,'Conc_log~0+Group',contr.matrix)) %>%
+  do(hypothesise3(.,"Conc_log~0+Group",contr.matrix)) %>%
   ungroup
 
 
 
 
-results<-lmdata %>%
+results.new<-lmdata %>%
   group_by(Contrast) %>%
   mutate(FDR=p.adjust(p.value,method = 'fdr'),
          PE=logFC+SE,
@@ -720,16 +859,13 @@ results %>%
   select(Contrast,logFC,p.value,FDR)
 
 
-results %>%
-  filter(Metabolite=='2-Hydroxyglutaric acid') %>%
+results.new %>%
+  filter(Metabolite=='Gly') %>%
   select(Contrast,logFC,p.value,FDR)
 
-results.old %>%
-  filter(Metabolite=='2-Hydroxyglutaric acid') %>%
-  select(Contrast,logFC,p.value,FDR)
-
-
-
+# results.old %>%
+#   filter(Metabolite=='2-Hydroxyglutaric acid') %>%
+#   select(Contrast,logFC,p.value,FDR)
 # allresults<-hypothesise(lmshape,metid,contr.matrix,formula="0+Group")
 # results.old<-allresults$All %>%
 #   rename(Metabolite_ID=Variable) %>%
@@ -737,21 +873,15 @@ results.old %>%
 #   left_join(met.mets) %>%
 #   select(Contrast,Description:Supplement,Metabolite_ID,Metabolite:HMDB_ID,everything())
 
-
-
-
 results.m<-results %>%
   gather(Stat,Value,logFC:logFDR)
   
-
 results.castfull<-results.m %>%
   arrange(Contrast,desc(Stat)) %>%
   unite(CS,Contrast,Stat) %>%
   select(Metabolite_ID:HMDB_ID,CS,Value) %>%
   spread(CS,Value)
   
-
-
 results.cast<-results.m %>%
   filter(Stat %in% c('logFC','FDR')) %>%
   arrange(Contrast,desc(Stat)) %>%
@@ -759,12 +889,8 @@ results.cast<-results.m %>%
   select(Metabolite_ID:HMDB_ID,CS,Value) %>%
   spread(CS,Value)
   
-
-
 head(results.castfull)
 head(results.cast)
-
-
 
 
 
@@ -779,10 +905,8 @@ allcontrs<-unique(as.character(results$Contrast))
 allmets<-unique(as.character(results$Metabolite))
 
 
-
-
-stats<-c('logFC','FDR','PE','NE')
-contcombs<-apply(expand.grid(contrs, stats), 1, paste, collapse="_")
+#stats<-c('logFC','FDR','PE','NE')
+#contcombs<-apply(expand.grid(contrs, stats), 1, paste, collapse="_")
 
 
 
@@ -790,8 +914,9 @@ resultsmin<-results %>%
   select(Metabolite,Contrast,logFC:logFDR)
 
 
+#load('.RData')
 
-results.exp<-expand.grid(allmets,contrs, contrs) %>%
+results.exp<-expand.grid(allmets,allcontrs, allcontrs) %>%
   rename(Metabolite=Var1,x=Var2,y=Var3) %>%
   left_join(results,by=c('Metabolite','y'='Contrast')) %>%
   left_join(resultsmin,by=c('Metabolite','x'='Contrast'),suffix = c("", "_x")) %>%
@@ -831,20 +956,19 @@ results.exp %>%
   geom_point()+
   scale_x_continuous(breaks=seq(-10,10,by=1))+
   scale_y_continuous(breaks=seq(-10,10,by=1))+
-  geom_text_repel(aes(label=ifelse(FDR<0.05 | FDR_x<0.05, as.character(Metabolite),"" ) ),
+  geom_text_repel(aes(label=ifelse(FDR<0.05 & FDR_x<0.05, as.character(Metabolite),"" ) ),
                   size=lblsize,
                   force=2,
                   segment.colour=errcolor,
                   segment.alpha =erralpha)+
   ggtitle('Effects of various factors compared against metformin effect on OP50',
-          subtitle = 'Metabolites with FDR<0.05 in either of effects are shown')+
+          subtitle = 'Metabolites with FDR<0.05 in both of the effects are shown')+
   xlab('Metformin effect on OP50')+
   ylab('Other effects')+
   scale_colour_gradientn(colours = gradcols,
                          breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
   facet_wrap(~Description,ncol=2)+
   theme(panel.grid.minor = element_blank())
-
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Scatter_Various_vs_OP50_Meft.pdf',sep = ''),
              width=18,height=18,useDingbats=FALSE)
@@ -922,10 +1046,6 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_Interaction.pdf',sep = '
 
 
 
-
-
-
-
 #Heatmap for summary
 
 unique(as.character(results$Description))
@@ -948,6 +1068,14 @@ comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
 
 
 
+comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
+               "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100")
+
+#, "Mutant difference for oeCRP+IPTG100"
+
+
+#"Treatment effect on OP50+Glucose",
+
 #Filter metabolites for clean heatmap
 sel.mets<-results %>%
   filter(Description %in% comparisons) %>%
@@ -961,17 +1089,13 @@ sel.mets<-results %>%
 
 #Chosen
 comparisons<-c("Treatment effect on OP50","Treatment effect on CRP","Mutant difference for oeCRP+IPTG50")
+#,"Mutant difference for oeCRP+IPTG100"
 
 sel.mets<-results %>%
   filter(Description %in% comparisons) %>%
   select(Contrast,Metabolite,FDR) %>%
   spread(Contrast,FDR) %>%
-  filter(C_Metf<0.05 & oeCRP50<0.05 & CRP_Metf>0.05 )
-
-
-
-
-
+  filter(C_Metf<0.05  & CRP_Metf>0.05 & (oeCRP50<0.05 ) )#| oeCRP100<0.05
 
 
 
@@ -1052,16 +1176,18 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Complete_tidy
              width=6,height=16,useDingbats=FALSE)
 
 
-
-
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP_tidy.pdf',sep = ''),
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP_All.pdf',sep = ''),
              width=6,height=16,useDingbats=FALSE)
 
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Complete.pdf',sep = ''),
-             width=8,height=16,useDingbats=FALSE)
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP50-100_stat_filter.pdf',sep = ''),
+             width=6,height=16,useDingbats=FALSE)
+
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP50_stat_filter.pdf',sep = ''),
+             width=4,height=8,useDingbats=FALSE)
 
 
-
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Treatment_OP50_oeCRP_vs_CRP.pdf',sep = ''),
-             width=6,height=8,useDingbats=FALSE)
+# dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Complete.pdf',sep = ''),
+#              width=8,height=16,useDingbats=FALSE)
+# dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Treatment_OP50_oeCRP_vs_CRP.pdf',sep = ''),
+#              width=6,height=8,useDingbats=FALSE)
