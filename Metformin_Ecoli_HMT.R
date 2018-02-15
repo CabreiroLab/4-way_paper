@@ -3,14 +3,7 @@ library(xlsx)
 library(tidyverse)
 
 
-# library(plyr)
-# library(reshape2)
-#library(multcomp)
-#library(contrast)
-#library(car)
 
-#Plotting and visualisation
-#library(gplots)
 library(heatmap3)
 library(ggplot2)
 #library(ggbiplot)
@@ -21,7 +14,9 @@ library(RColorBrewer)
 
 library(gtools)
 
-library(ellipse)
+
+
+library(ggthemes)
 
 #library(Unicode)
 
@@ -31,7 +26,7 @@ devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
-library(ggthemes)
+
 theme_Publication <- function(base_size=14) {
   
   (theme_foundation(base_size=base_size)
@@ -82,18 +77,6 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
 
-getinfo<-function(cof) {
-  df<-data.frame(cof)
-  df$Comparisons<-rownames(df)
-  return(df)
-}
-
-getellipse<-function(x,y,sc=1) {
-  as.data.frame(ellipse::ellipse( cor(x, y),
-                         scale=c(sd(x)*sc,sd(y)*sc),
-                         centre=c( mean(x),mean(y)) ))
-}
-
 .simpleCap <- function(x) {
   s <- strsplit(x, " ")[[1]]
   paste(toupper(substring(s, 1, 1)), substring(s, 2),
@@ -101,11 +84,6 @@ getellipse<-function(x,y,sc=1) {
 }
 
 
-MinMeanSDMMax <- function(x) {
-  v <- c(min(x), mean(x) - sd(x), mean(x), mean(x) + sd(x), max(x))
-  names(v) <- c("ymin", "lower", "middle", "upper", "ymax")
-  v
-}
 
 
 met.raw<-read.xlsx2('HMT_Ecoli_complete/Raw_data.xlsx',sheetName='Raw',
@@ -447,7 +425,6 @@ met.heat<-met.sel %>%
 met.heat<-met.sel %>%
   filter(Group %in% c("C_0_N","C_50_N","C_0_I50","oeCRP_0_I50","oeCRP_0_I100"))
  
-
 
 #Heatmap - WhatFilipeAsked
 met.heat<-met.sel %>%
@@ -1128,7 +1105,7 @@ clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nste
 
 d<-dist(as.matrix(heatsum),method = "euclidean")
 h<-hclust(d)
-
+ordmet<-rownames(heatsum[h$order,])
 
 
 #rownames(heatsum[h$order,])
@@ -1140,7 +1117,7 @@ h<-hclust(d)
 #              xlab='Comparison',Rowv=TRUE,breaks = brks,dendrogram="row",scale="none")
 #ordmet<-rownames(heatsum[hm$rowInd,])
 
-ordmet<-rownames(heatsum[h$order,])
+
 
 
 if (length(ordmet)!=length(unique(ordmet))){

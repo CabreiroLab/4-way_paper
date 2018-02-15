@@ -1,38 +1,14 @@
 options(java.parameters = "-Xmx4096m") 
 
-#That's for annotations
-# library(org.Ce.eg.db)
-# library(celegans.db)
-# library(GO.db)
+
 library(biomaRt)
 
-# library(ballgown)
-# library(edgeR)
-
-#library(genefilter)
-
-#library(dplyr)
-
+library(readxl)
 library(devtools)
-
-
-
 library(tidyverse)
-
-library(reshape2)
-
-
 
 library(heatmap3)
 library(gplots)
-
-
-
-library(grid)
-library(gridExtra)
-
-
-
 
 library(xlsx)
 
@@ -116,6 +92,24 @@ dim(celegans.annotation)
 
 
 
+sbs<-read.table('Results_1thrs_newannot/MTA/Subsystems.txt',sep = '@',header = TRUE) %>%
+  mutate_all(.funs=c(as.character)) %>%
+  mutate(Subsystem=gsub('&apos, ','',Subsystem)) %>%
+  splitstackshape::cSplit('Subsystem', ', ',direction = 'long') %>%
+  mutate(Subsystem=gsub('<i>','',Subsystem),
+         Subsystem=gsub('<\\i>','',Subsystem))
+
+
+unique(sbs$Subsystem)
+
+sbs %>%
+  group_by(Subsystem) %>%
+  summarise(Count=n())
+  
+
+
+
+
 
 
 
@@ -131,39 +125,34 @@ MTAinfo<-data.frame('File'=MTAfiles,'Contrast'=conts,'Transition'=trans) %>%
 
 
 
-
-
-MTAall<-data.frame()
-
-for (fli in 1:nrow(MTAinfo)){
-  
-  fl<-as.character(MTAinfo[fli,'File'])
-  print(fl)
-  dat<-read.xlsx(paste0('~/Dropbox/Projects/OP50_Celegans_holobiont/Data/RNAseq_Bootstrapping_separate_4_removed_1thrs/results/',fl),
-                 sheetName = paste0('bootstrap_MTA_',MTAinfo[fli,'Transition']),check.names=FALSE) %>%
-    rename(Gene=Var1) %>%
-    gather(Bootstrap,Value,contains('_')) %>%
-    mutate(Contrast=as.character(MTAinfo[fli,'Contrast']))
-  
-  
-  # dat<-dat.r[,c('Gene number','Gene ID','NA','Mean')]
-  # dat<-plyr::rename(dat,c('NA'='Description') )
-  # dat$Contrast<-MTAinfo[fli,'Contrast']
-  
-  MTAall<-rbind(MTAall,dat)
-  
+readMTA<-function(data) {
+  dat<-read_xlsx(paste0('~/Dropbox/Projects/OP50_Celegans_holobiont/Data/RNAseq_Bootstrapping_separate_4_removed_1thrs/results/',data$File),
+                 sheet = paste0('bootstrap_MTA_',data$Transition)) %>%
+    gather(Bootstrap,Value,contains('_'))
+  return(dat)
 }
 
 
-cuts<-MTAall%>%
-  filter(Gene=='cutoff') %>%
-  rename(Cutoff=Value) %>%
-  mutate(Gene=NULL)
+MTAall<-MTAinfo %>%
+  as_tibble %>%
+  group_by(File,Contrast,Transition) %>%
+  do(readMTA(data=.)) %>%
+  rename(Gene=Var1)%>%
+  group_by(File,Contrast,Transition,Bootstrap) %>%
+  mutate(Cutoff=Value[Gene=='cutoff']) %>%
+  filter(Gene!='cutoff')
+
+
+
+
+MTAgenes<-unique(MTAall$Gene)
+Modelgenes<-unique(sbs$Gene)
+
+setdiff(MTAgenes,Modelgenes)
+
 
 
 MTAvals<-MTAall%>%
-  filter(Gene!='cutoff') %>%
-  left_join(cuts) %>%
   mutate(Pass=Value>Cutoff*1.01) %>%
   group_by(Contrast,Bootstrap,Pass) %>%
   mutate(Rank=rank(Value),
@@ -173,26 +162,29 @@ MTAvals<-MTAall%>%
   mutate(Percentile=ifelse(Pass,Percentile,0),
          Rank=ifelse(Pass,Rank,0),
          Complete=ifelse(Bootstrap=='None_None','Complete','Trimmed')) %>%
-  gather(PR,Meas,Percentile,Rank)
+  gather(PR,Measurement,Percentile,Rank)
+
+
+
+head(MTAvals)
 
   
   
 
-  
   
 MTAsum<-MTAvals%>% 
   #Summarise over all bootstraps
-  group_by(Gene,Contrast,Complete,PR) %>%
-  summarise(Mean=mean(Meas),
-            SD=sd(Meas),
-            Median=median(Meas),
-            Q25=quantile(Meas,0.25),
-            Q75=quantile(Meas,0.75)) %>%
+  group_by(Gene,Contrast,Transition,Complete,PR) %>%
+  summarise(Mean=mean(Measurement),
+            SD=sd(Measurement),
+            Median=median(Measurement),
+            Q25=quantile(Measurement,0.25),
+            Q75=quantile(Measurement,0.75)) %>%
   ungroup %>%
-  gather(Stat,Value,Median,Mean,SD,Q25,Q75) %>%
+  gather(Stat,Value,Mean:Q75) %>%
   spread(Complete,Value) %>%
   mutate(Score=ifelse(grepl('_Mean|_Median',Stat),0.2*Complete+0.8*Trimmed,Trimmed),
-         PR=ifelse(PR=='Percentile','P','R')) %>%
+         PR=recode(PR,'Percentile'='P','Rank'='R')) %>%
   mutate(ensembl_gene_id=celegans.annotation[match(as.character(Gene),celegans.annotation$external_gene_name),'ensembl_gene_id'],
          ensembl_gene_id=ifelse(is.na(ensembl_gene_id),
                                 celegans.annotation[match(as.character(Gene),celegans.annotation$wormbase_gene_seq_name),'ensembl_gene_id'],
@@ -200,11 +192,46 @@ MTAsum<-MTAvals%>%
   left_join(celegans.annotation)
 
 
+
 MTA<-MTAsum %>%
   unite(Contrast_PR_Stat,Contrast,PR,Stat,remove = TRUE) %>%
-  select(-Complete,-Trimmed) %>%
+  select(-Complete,-Trimmed,-Transition) %>%
   spread(Contrast_PR_Stat,Score)
   
+head(MTA)
+
+
+MTA %>%
+  arrange(desc(SM_S_R_Mean))
+
+
+Subsystems<-sbs %>%
+  right_join(MTAsum)
+
+
+length(unique(Subsystems$Subsystem))
+
+
+
+Subsystems.sum<-Subsystems %>%
+  #Choose rank or percentile as measure
+  filter(Stat=='Mean' & PR=='R') %>%
+  group_by(Subsystem,Contrast) %>%
+  summarise(Mean=mean(Score),SD=sd(Score),Sum=sum(Score)) %>%
+  gather(Stat,Value,Mean:Sum) %>%
+  unite(CS,Contrast,Stat) %>%
+  spread(CS,Value) %>%
+  arrange(desc(SM_S_SD))
+
+
+
+Subsystems.sum %>%
+  write.csv(paste0(odir,'/Subsystems_results.csv'),row.names = FALSE)
+
+
+
+View(Subsystems.sum)
+
 
 
 
@@ -214,7 +241,7 @@ MTAvals.sel<-subset(MTAvals,PR=='Percentile' & Gene %in% as.character(subset(MTA
 MTAsum.sel<-subset(MTAsum,PR=='P' & Gene %in% as.character(subset(MTA,SM_S_P_Median>80)$Gene) & Stat=='Median')
 
 
-ggplot(MTAvals.sel,aes(x=Gene,y=Meas))+
+ggplot(MTAvals.sel,aes(x=Gene,y=Measurement))+
   geom_violin()+
   geom_point()+
   geom_point(data=MTAsum.sel,aes(x=Gene,y=Score),color='red')+
@@ -417,7 +444,7 @@ for (ctr in comps) {
 DAVID<-subset(DAVID, Term!='cel01130:Biosynthesis of antibiotics')
 
 
-write.csv(DAVID,paste(odir,'/DAVID_results.csv',sep=''),row.names = FALSE)
+write.csv(DAVID,paste0(odir,'/DAVID_results.csv'),row.names = FALSE)
 
 
 head(DAVID)
