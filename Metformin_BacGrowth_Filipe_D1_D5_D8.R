@@ -1,56 +1,16 @@
-library(xlsx)
-library(plyr)
-library(reshape2)
-library(tidyr)
-library(ggplot2)
+library(tidyverse)
+library(readxl)
 
-library(gplots)
-library(gtools)
-library(rgl)
-library(cluster)
-library(heatmap3)
-
-library(multcomp)
-library(contrast)
 library(RColorBrewer)
-
-library(grid)
-library(gridExtra)
 library(ggrepel)
 
 
 devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
+remove(adjustments)
+
 theme_set(theme_light())
-
-getinfo<-function(cof) {
-  df<-data.frame(cof)
-  df$Comparisons<-rownames(df)
-  return(df)
-}
-
-
-mycolsplit<-function(column,cols,sep=':'){
-  elems<-unlist(strsplit(column,paste("([\\",sep,"])",sep=''), perl=TRUE))
-  return(as.data.frame(matrix(elems,ncol=cols,byrow=TRUE)))
-}
-
-
-MinMeanSDMMax <- function(x) {
-  v <- c(min(x), mean(x) - sd(x), mean(x), mean(x) + sd(x), max(x))
-  names(v) <- c("ymin", "lower", "middle", "upper", "ymax")
-  v
-}
-
-mymerge<-function(all.results,results) {
-  if (dim(all.results)[[1]]==0) {
-    all.results<-results
-  } else {
-    all.results<-merge(all.results,results,all.x=TRUE,all.y=TRUE)
-  }
-  return(all.results)
-}
 
 
 
@@ -93,41 +53,25 @@ cwd<-"~/Dropbox/Projects/Metformin_project/Bacterial Growth Assays/"
 setwd(cwd)
 
 
+
+
 odir<-'Summary_Filipe_D1_D5_D8'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
 
-rawdata<-read.xlsx2('Filipe_bac_growth/Bacterial_growth_curve_D1_D5_D8.xlsx',
-                    sheetName = 'Clean',header = TRUE,check.names = FALSE,
-                    colClasses = c(rep('character',3),rep('numeric',217)))
-head(rawdata)
-dim(rawdata)
-
-
-colnames(rawdata)[4:24]
-
-rawdata.adj<-rawdata
-
-rawdata.adj[,4:220]<-rawdata[,4:220]-apply(rawdata[,4:24],1,mean)
-
-rawdata[,1:20]
-rawdata.adj[,1:24]
-
-
-data.r<-melt(rawdata,id.vars = c('Strain','Day','Replicate'),variable.name = 'Time_min',value.name='OD_raw')
-data.r$Time_min<-as.numeric(as.character(data.r$Time_min))
-data.r$Time_h<-data.r$Time_min/60
+data<-read_xlsx('Filipe_bac_growth/Bacterial_growth_curve_D1_D5_D8.xlsx',sheet= 'Clean') %>%
+  mutate_at(c('Day','Strain','Replicate'),as.factor) %>%
+  gather(Time_min,OD_raw,matches("[[:digit:]]")) %>%
+  mutate_at(c('Time_min','OD_raw'),as.numeric) %>%
+  group_by(Day, Strain, Replicate) %>%
+  mutate(Time_h=Time_min/60,
+         Base=mean(OD_raw[Time_h<1]),
+         OD=OD_raw-Base) %>%
+  ungroup
 
 
 
-
-baseline<-ddply(subset(data.r,Time_min<=100),.(Strain,Day,Replicate),summarise,Baseline=mean(OD_raw))
-data<-merge(data.r,baseline,by=c('Day','Strain','Replicate'),all.x=TRUE)
-data$OD<-data$OD_raw-data$Baseline
-
-
-head(data)
 
 
 ggplot(data,aes(x=Time_h,y=OD))+
@@ -141,14 +85,15 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-data.sum<-ddply(data,.(Day,Strain,Time_min,Time_h),summarise,OD_Mean=mean(OD),OD_SD=sd(OD))
-
-head(data.sum)
+data.sum<-data %>%
+  group_by(Day,Strain,Time_min,Time_h) %>%
+  summarise(OD_Mean=mean(OD),
+            OD_SD=sd(OD))
 
 ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Strain,fill=Strain))+
   geom_line()+
   geom_ribbon(aes(ymin=OD_Mean-OD_SD,
-                  ymax=OD_Mean+OD_SD),alpha=0.5)+
+                  ymax=OD_Mean+OD_SD),alpha=0.5,color=NA)+
   xlab('Time, h')+
   ylab('OD')+
   scale_x_continuous(breaks=seq(0,18,by=2))+
@@ -160,73 +105,86 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-
-
-data.int<-ddply(data,.(Day,Strain,Replicate),summarise,OD_Int=sum(OD)*5/60)
-data.int$logOD_Int<-log2(data.int$OD_Int)
-
-data.int$Sample<-paste(data.int$Strain,data.int$Day,sep='_')
-data.int$Sample<-gsub('-','',data.int$Sample)
-
-head(data.int)
+data.int<-data %>%
+  group_by(Day,Strain,Replicate) %>%
+  summarise(OD_Int=sum(OD)*5/60) %>%
+  mutate(logOD_Int=log2(OD_Int),
+         Sample=paste(gsub('-','',Strain),Day,sep='_')) %>%
+  gather(Measure,Value,OD_Int,logOD_Int)
+  
+  
 
 sel.samples<-unique(data.int$Sample)
 
 
 
 
-contrasts<-read.contrasts('!Contrasts_Filipe_Bac.xlsx','Contrasts_values',sel.samples,variables = c('Day'))
+contrasts<-read.contrasts2('!Contrasts_Filipe_Bac.xlsx')
 
-contrasts.table<-contrasts$Contrasts.table
+contrasts$Contrasts.table
+
+contrasts.desc<-contrasts$Contrasts.table %>%
+  select(Description:Strain)
+
 contr.matrix<-contrasts$Contrasts.matrix
 contr.matrix
 
-
-contrasts.table
-
+contrasts.desc
 
 
-allresults<-hypothesise(data.int,c('OD_Int','logOD_Int'),contr.matrix,formula='0+Sample')$All
+lmdata<-data.int%>%
+  group_by(Measure) %>%
+  do(hypothesise2(.,formula='Value~0+Sample',contr.matrix))
+  
+
+results<-contrasts.desc %>%
+  left_join(lmdata) %>%
+  adjustments %>%
+  mutate(Contrast=factor(Contrast,levels=contrasts.desc$Contrast)) %>%
+  select(Measure,Contrast,Description:Strain,everything())
 
 
-results<-merge(contrasts.table[,c('Contrast','Description','Contrast_type','Strain','Day')],allresults,by='Contrast',all.x=TRUE)
 
-results$pStars<-stars.pval(results$p.value)
-results$pStars<-gsub('\\.','',as.character(results$pStars))
-results$pStars<-gsub(' ','',as.character(results$pStars))
-results$Day<-as.factor(results$Day)
+results.m<-results %>%
+  gather(Stat,Value,logFC:logFDR)
 
-head(results)
+results.castfull<-results.m %>%
+  arrange(Contrast,desc(Stat)) %>%
+  unite(CS,Contrast,Stat) %>%
+  select(Measure,CS,Value) %>%
+  spread(CS,Value)
+
+results.cast<-results.m %>%
+  filter(Stat %in% c('logFC','FDR')) %>%
+  arrange(Contrast,desc(Stat)) %>%
+  unite(CS,Contrast,Stat) %>%
+  select(Measure,CS,Value) %>%
+  spread(CS,Value)
+
+head(results.castfull)
+head(results.cast)
 
 
 write.csv(results,paste(odir,'/Growth_results.csv',sep=''),row.names = FALSE)
 
 
-results.m<-melt(results,id.vars = c('Contrast','Contrast_type','Description','Strain','Day','Variable'),
-                measure.vars = c('logFC','p.value','SE','t.value','PE','NE','FDR','logFDR'),
-                variable.name = 'Stat',value.name = 'Value')
 
+ODstars_day<-results %>%
+  filter(Measure=='OD_Int' & Contrast_type=='Strain') %>%
+  select(Day,pStars)
 
-results.castfull<-dcast(subset(results.m,Stat %in% c('logFC','SE','FDR','NE','PE','logFDR') ),Variable~Contrast+Stat,value.var = 'Value')
-results.cast<-dcast(subset(results.m,Stat %in% c('logFC','FDR')),Variable~Contrast+Stat,value.var = 'Value')
-
-head(results.cast)
-
-head(results)
-
-dwidth<-0.5
-
-ODstars_day<-subset(results,Variable=='OD_Int' & Contrast_type=='Strain')[,c('Day','pStars')]
 ODstars_day$Strain<-'N2'
 
 head(data.int)
 
-ggplot(data.int, aes(x=Day,y=OD_Int,fill=Strain))+
+
+dwidth<-0.5
+
+data.int %>%
+  filter(Measure=='OD_Int') %>%
+  ggplot(aes(x=Day,y=Value,fill=Strain))+
   geom_bar(stat = 'summary', fun.y = 'mean',position = position_dodge(width=dwidth),width=0.5) +
   ylab('OD integral, OD*h')+
-  # geom_point(shape = 21,position =
-  #              position_jitterdodge(jitter.width = 0.2, jitter.height=0,
-  #                                   dodge.width= dwidth))+
   geom_errorbar(stat = 'summary', position = position_dodge(width=dwidth), width = 0.2)+
   geom_text(data=ODstars_day,aes(x=Day,y=4.5,label=as.character(pStars)))
 
@@ -235,16 +193,19 @@ dev.copy2pdf(device=cairo_pdf,
              width=6,height=4)
 
 
-logODstars_day<-subset(results,Variable=='logOD_Int' & Contrast_type=='Strain')[,c('Day','pStars')]
+
+logODstars_day<-results %>%
+  filter(Measure=='logOD_Int' & Contrast_type=='Strain') %>%
+  select(Day,pStars)
+
 logODstars_day$Strain<-'N2'
 
 
-ggplot(data.int, aes(x=Day,y=logOD_Int,fill=Strain))+
+data.int %>%
+  filter(Measure=='logOD_Int') %>%
+  ggplot(aes(x=Day,y=Value,fill=Strain))+
   geom_bar(stat = 'summary', fun.y = 'mean',position = position_dodge(width=dwidth),width=0.5) +
   ylab('log2 OD integral, log2(OD*h)')+
-  # geom_point(shape = 21,position =
-  #              position_jitterdodge(jitter.width = 0.2, jitter.height=0,
-  #                                   dodge.width= dwidth))+
   geom_errorbar(stat = 'summary', position = position_dodge(width=dwidth), width = 0.2)+
   geom_text(data=logODstars_day,aes(x=Day,y=2.25,label=as.character(pStars)))
 
@@ -257,11 +218,13 @@ dev.copy2pdf(device=cairo_pdf,
 
 #By strain
 
-ODstars_strain<-subset(results,Variable=='OD_Int' & Contrast_type=='Time' & !Contrast %in% c('N2_8-5','Phm2_8-5') )
-ODstars_strain
-head(data.int)
+ODstars_strain<-results %>%
+  filter(Measure=='OD_Int' & Contrast_type=='Time' & !Contrast %in% c('N2_8-5','Phm2_8-5') )
 
-ggplot(data.int, aes(x=Day,y=OD_Int,fill=Strain))+
+
+data.int %>%
+  filter(Measure=='OD_Int') %>%
+  ggplot(aes(x=Day,y=Value,fill=Strain))+
   geom_bar(stat = 'summary', fun.y = 'mean',position = position_dodge(width=dwidth),width=0.5) +
   ylab('OD integral, OD*h')+
   # geom_point(shape = 21,position =
@@ -279,10 +242,13 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-logODstars_strain<-subset(results,Variable=='OD_Int' & Contrast_type=='Time' & !Contrast %in% c('N2_8-5','Phm2_8-5') )
+logODstars_strain<-results %>%
+  filter(Measure=='logOD_Int' & Contrast_type=='Time' & !Contrast %in% c('N2_8-5','Phm2_8-5') )
 
 
-ggplot(data.int, aes(x=Day,y=logOD_Int,fill=Strain))+
+data.int %>%
+  filter(Measure=='logOD_Int') %>%
+  ggplot(aes(x=Day,y=Value,fill=Strain))+
   geom_bar(stat = 'summary', fun.y = 'mean',position = position_dodge(width=dwidth),width=0.5) +
   ylab('log2 OD integral, log2(OD*h)')+
   # geom_point(shape = 21,position =
