@@ -157,9 +157,15 @@ data.int<-data %>%
          Group=paste(recode(Strain,'OP50'='C','OP50-MR'='MR'),recode(Metformin_mM,'0'='C','50'='T'),sep='_'),
          DDay=paste0('D',Day)) %>%
   gather(Measure,Value,OD_Int,logOD_Int)
-  
-  
-head(data.int)
+
+
+
+data.int.sum<-data.int %>%
+  group_by(Measure,Day,Strain,Metformin_mM) %>%
+  summarise(Mean=mean(Value),SD=sd(Value))
+
+
+
 
 
 
@@ -265,17 +271,23 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-data.int %>%
+data.int.sum %>%
   filter(Measure=='OD_Int') %>%
-  ggplot(aes(x=Day,y=Value,color=Strain,linetype=Metformin_mM))+
-  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "dodge",alpha=0.5) +
+  ggplot(aes(x=Day,y=Mean,color=Metformin_mM))+
+  stat_summary(aes(group=interaction(Metformin_mM)),fun.y=sum, geom="line")+
+  geom_errorbar(aes(ymin=Mean-SD,ymax=Mean+SD),width = 0.2)+
+  geom_point(size=2)+
   ylab('AUC, OD*h')+
   xlab('Day')+
-  scale_y_continuous(breaks=0:10)+
-  labs(color='Strain',
-       linetype='Metformin, mM')+
-  geom_text(data=ODstars_day,aes(x=Day,y=ifelse(Metformin_mM=='0',5,4.5),label=as.character(pStars)))
+  scale_y_continuous(breaks=0:10,limits=c(2,4.2))+
+  labs(color='Metformin, mM')+
+  geom_text(data=ODstars_day,aes(x=Day,y=ifelse(Metformin_mM=='0',4.2,4.1),label=as.character(pStars)),nudge_x = -0.5)+
+  geom_text(data=ODstars_treatment,aes(x=Day,label=as.character(pStars)),y=4,color='black')+
+  facet_grid(~Strain)
 
 
-
+dev.copy2pdf(device=cairo_pdf,
+             useDingbats=FALSE,
+             file=paste(odir,"/Growth_Summary_OD_int_by_day_line.pdf",sep=''),
+             width=5,height=3)
 

@@ -1,31 +1,18 @@
 #Data transformation and analysis
-library(xlsx)
-library(plyr)
-library(reshape2)
-library(multcomp)
-library(contrast)
-library(car)
+library(tidyverse)
+library(readxl)
 
-#Plotting and visualisation
-library(gplots)
-library(heatmap3)
-library(ggplot2)
-library(ggbiplot)
 library(ggrepel)
 library(RColorBrewer)
-library(plot3D)
 
-
-library(gtools)
-
-library(ellipse)
+library(ComplexHeatmap)
+library(circlize)
 
 library(ggthemes)
 
 
 devtools::install_github("PNorvaisas/PFun")
 library(PFun)
-
 
 
 theme_Publication <- function(base_size=14) {
@@ -63,8 +50,8 @@ theme_set(theme_Publication())
 
 setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
 
-
-
+#save.image('Metabolomics_Celegans_FA.RData')
+#load('Metabolomics_Celegans_FA.RData')
 
 
 odir<-'Summary_Celegans_FA'
@@ -72,139 +59,60 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
 
-getinfo<-function(cof) {
-  df<-data.frame(cof)
-  df$Comparisons<-rownames(df)
-  return(df)
-}
-
-getellipse<-function(x,y,sc=1) {
-  as.data.frame(ellipse( cor(x, y),
-                         scale=c(sd(x)*sc,sd(y)*sc),
-                         centre=c( mean(x),mean(y)) ))
-}
-
-.simpleCap <- function(x) {
-  s <- strsplit(x, " ")[[1]]
-  paste(toupper(substring(s, 1, 1)), substring(s, 2),
-        sep = "", collapse = " ")
-}
-
-
-MinMeanSDMMax <- function(x) {
-  v <- c(min(x), mean(x) - sd(x), mean(x), mean(x) + sd(x), max(x))
-  names(v) <- c("ymin", "lower", "middle", "upper", "ymax")
-  v
-}
-
-
-
-#Needs to be manual
-
-met.raw<-read.xlsx2('Metformin FA worm data.xlsx',sheetName='Complete_table',
-                    header=TRUE,endRow=27,
-                    colClasses=c(rep("character",6), rep("numeric", 24)))
-
-
-
-head(met.raw)
-
-FAs<-colnames(met.raw)[7:length(colnames(met.raw))]
-
-
-rowmeans<-apply(met.raw[,FAs],1,mean)
-allmean<-mean(rowmeans,na.rm = TRUE)
-norms<-rowmeans/allmean
-
-met.norm<-met.raw
-met.norm[,FAs]<-met.raw[,FAs]/norms
-
-
-
-met.m<-melt(met.norm,measure.vars = FAs,variable.name = 'Metabolite',value.name = 'Conc')
-met.m$Metabolite<-gsub('\\.',':',met.m$Metabolite)
-met.m$Metabolite<-ifelse(met.m$Metabolite=="C18:2w6:cis","C18:2w6 cis",met.m$Metabolite)
-
-
-
-
-
-#write.csv(metabolites,'AA.csv')
-met.names<-read.xlsx2('Metformin FA worm data.xlsx',sheetName='Fat_names',
-                      header=TRUE,
-                      colClasses=c(rep("character",3)))
-
-
-FAs<-unique(as.character(met.m$Metabolite))
-FAs.c<-unique(as.character(met.names$Lipid.name))
-
-setdiff(FAs,FAs.c)
-
-met<-merge(met.m,met.names,by.x = 'Metabolite',by.y='Lipid.name',all.x = TRUE)
-
-head(met)
-
-met<-subset(met,Metabolite!="")
-
-#met$Conc<-ifelse(met$Conc==0,NA,met$Conc)
-#met$Sample<-gsub('[[:digit:]]', '', met$Code)
-#met$Sample<-ifelse(met$Sample %in% c('C','R'),paste(met$Sample,'0',sep=''),met$Sample)
-#met$Replicate<-gsub('[[:alpha:]]', '', met$Code)
-#met$Metformin_mM<-ifelse(grepl("M",met$Sample),50,0)
-met$Metformin_mM<-as.factor(met$Metformin_mM)
-met$Group<-as.factor(met$Group)
-#met$Strain<-ifelse(grepl("R",met$Sample),'OP50-MR','OP50-C')
-
-
 strains<-c('OP50','OP50-MR','OP50-crp','nhr-49')
-met$Strain<-factor(met$Strain,levels=strains,labels=strains)
-met
+
+met.names<-read_xlsx('Metformin FA worm data.xlsx',sheet='Fat_names') %>%
+  rename(Metabolite=`Lipid name`)
+
+removals<-read_xlsx('Metformin FA worm data.xlsx',sheet='Removals') %>%
+  mutate(SampleMet=paste(Sample,Metabolite))
 
 
-met$Metabolite<-trimws(met$Metabolite)
-met$Metabolite<-as.factor(met$Metabolite)
-met$Common.name<-as.factor(met$Common.name)
-met$Conc<-as.numeric(met$Conc) 
-met$logConc<-log(met$Conc,2)
-
-unique(met$Group)
-metabolites<-as.character(unique(met$Metabolite))
-
-
-
-removals<-read.xlsx2('Metformin FA worm data.xlsx',sheetName='Removals',
-                     header=TRUE,
-                     colClasses=c(rep("character",2)))
-
-removals
-
-met.clean<-met
-for (i in 1:nrow(removals)){
-  met.clean<-subset(met.clean,!(Sample==as.character(removals[i,'Sample']) & Metabolite==as.character(removals[i,'Metabolite'])) )
-}
+met<-read_xlsx('Metformin FA worm data.xlsx',sheet='Complete_table') %>%
+  gather(Metabolite,Conc,everything(),-c(Name:Sample)) %>%
+  group_by(Sample) %>%
+  mutate(SampleMean=mean(Conc)) %>%
+  ungroup %>%
+  mutate(ConcNorm=Conc/(SampleMean/mean(SampleMean)),
+         logConc=log2(ConcNorm),
+         Metabolite=ifelse(Metabolite=="C18:2w6:cis","C18:2w6 cis",Metabolite),
+         Strain=factor(Strain,levels=strains)) %>%
+  group_by(Group,Metabolite) %>%
+  mutate(logConc_group=mean(logConc)) %>%
+  ungroup %>%
+  mutate(logConc_fill=ifelse(paste(Sample,Metabolite) %in% removals$SampleMet, logConc_group,logConc)) %>%
+  left_join(met.names) %>%
+  mutate_at(c('Sample','Name','Metformin_mM','Group','Replicate','Metabolite','Common name','Clean name'),as.factor)
 
 
+metinfo<-met %>%
+  group_by(Sample,Group,Strain,Metformin_mM,Replicate) %>%
+  summarise %>%
+  data.frame
 
-# nuc$Replicate<-as.numeric(gsub("\\D", "", nuc$Sample))
-# nuc$Type<-as.character(gsub("[[:digit:]]", "", nuc$Sample))
-# nuc$Class<-as.factor(nuc$Class)
-#nuc$Type<-factor(nuc$Type,levels=c('C','CM','R','RM'),labels=c('C','CM','R','RM'))
+rownames(metinfo)<-metinfo$Sample
 
-metslm<-dcast(met,Sample+Group+Strain+Metformin_mM+Replicate~Metabolite,value.var = c('logConc'),drop=TRUE)#,fill = as.numeric(NA)
 
-#metslm<-dcast(subset(met,Strain %in% c('OP50','OP50-MR') ),Sample+Group+Strain+Metformin_mM+Replicate~Metabolite,value.var = c('logConc'),drop=TRUE)#,fill = as.numeric(NA)
+metslm<-met %>%
+  filter(Strain %in%  c('OP50','OP50-MR')) %>%
+  select(Sample,Metabolite,logConc_fill) %>%
+  spread(Metabolite,logConc_fill) %>%
+  data.frame
+
+
+
 
 rownames(metslm)<-metslm$Sample
 head(metslm)
 
-View(metslm)
 
-subset(metslm,Strain=='nhr-49')
+pca.dat<-metslm %>%
+  select(-Sample)
 
 
 #Find compounds with missing values
-miss.cols<-apply(metslm, 2, function(x) any(is.na(x)))
-miss.rows<-apply(metslm, 1, function(x) any(is.na(x)))
+miss.cols<-apply(pca.dat, 2, function(x) any(is.na(x)))
+miss.rows<-apply(pca.dat, 1, function(x) any(is.na(x)))
 
 missing.cols<-names(miss.cols[miss.cols==TRUE])
 missing.rows<-rownames(metslm)[miss.rows==TRUE]
@@ -212,43 +120,34 @@ missing.rows<-rownames(metslm)[miss.rows==TRUE]
 missing.cols
 missing.rows
 
-# 
-# metslm[missing.rows,]
-# cleancols<-setdiff(cols,missing.cols)
-# cleanrows<-setdiff(rownames(metslm),missing.rows)
+cleancols<-setdiff(colnames(pca.dat),missing.cols)
 
-
-pca.group<-metslm$Sample
-
-pca.dat<-metslm[,metabolites]
-
+pca.dat<-pca.dat[,cleancols]
 
 
 ir.pca <- prcomp(pca.dat,
                  center = TRUE,
-                 scale. = TRUE) 
+                 scale. = TRUE)
+
+
 plot(ir.pca,type='l')
 
 
+pcadata<-data.frame(ir.pca$x) %>%
+  rownames_to_column('Sample') %>%
+  left_join(metinfo)
 
-pcadata<-data.frame(ir.pca$x)
-pcadata[,c('Sample','Strain','Group','Metformin_mM')]<-metslm[,c('Sample','Strain','Group','Metformin_mM')]
-
-#pcadata<-merge(data.frame(ir.pca$x),metslm[,c('Sample','Strain','Metformin_mM')],by = 0)
 
 pcaresult<-summary(ir.pca)$importance
 PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
 PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
 
-
 # write.csv(pcadata,paste(odir,'/PCA_data_OP50_OP50-MR.csv',sep=''))
 # write.csv(pcaresult,paste(odir,'/PCA_variance_OP50_OP50-MR.csv',sep=''))
 
-
-
-
-ellipses<-ddply(pcadata,.(Strain,Group,Metformin_mM), summarise, x=getellipse(PC1,PC2,1)$x,y=getellipse(PC1,PC2,0.75)$y ) 
-
+ellipses<-pcadata %>%
+  group_by(Strain,Group,Metformin_mM) %>%
+  do(getellipse(.$PC1,.$PC2,1))
 
 ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
   xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
@@ -267,62 +166,45 @@ dev.copy2pdf(device=cairo_pdf,
              width=12,height=9)
 
 
-#cleanmets<-setdiff(allmets,missing.cols)
-
-
 
 
 #Heatmap
-heatshape<-dcast(met.clean,Clean.name~Group+Replicate,value.var = 'logConc')
+heatshape<-met %>%
+  filter(Strain %in%  c('OP50','OP50-MR')) %>%
+  select(`Clean name`,Sample,logConc) %>%
+  spread(Sample,logConc) %>%
+  data.frame
+
+
 
 rownames(heatshape)<-heatshape$Clean.name
 heatshape$Clean.name<-NULL
 
-#heatshape<-heatshape[apply(heatshape,1,function(x) all(!is.na(x))) ,]
-
-#Remove numbers from sample IDs
-#groups<-gsub('_[[1-6]]?', '', colnames(heatshape))
 
 
+#Order anotation by heatmap colnames
+hanot<-metinfo[colnames(heatshape),] %>%
+  select(Strain,Metformin_mM)
+
+ha<-HeatmapAnnotation(df=hanot, col = list(Metformin_mM=c('50'='black','0'='white')))
+
+heatshape.sc<-t(scale(t(heatshape)))
+
+#make anotated heatmap
+Heatmap(heatshape.sc,name = 'Z-score',
+              #col=bgg4,
+              column_names_side = 'top',
+              clustering_method_rows='ward.D2',
+              #clustering_method_columns ='ward.D2',
+              top_annotation = ha,
+              row_dend_reorder = TRUE,
+              column_dend_reorder = TRUE,
+              row_names_max_width = unit(10, "cm"))
 
 
-
-groups<- substr(colnames(heatshape),1,nchar(colnames(heatshape))-2)
-str.tr<- matrix(unlist(strsplit(groups,'_')),2,byrow=FALSE)
-strains<-str.tr[1,]
-treat<-str.tr[2,]
-
-
-colnames(heatshape)
-groups
-
-strains.fac<-factor(strains)
-treat.fac<-factor(treat)
-#ColSideColors<-rainbow(length(unique(annData)))[as.numeric(annData)]
-
-strains.col<-rainbow(length(unique(strains.fac)))[as.numeric(strains.fac)]
-treat.col<-ifelse(treat.fac=='C','white','black')
-#grayscale(length(unique(treat.fac)))[as.numeric(treat.fac)]
-  
-legtxt<-as.character(unique(strains.fac))
-legcol<-rainbow(length(unique(strains.fac)))[as.numeric(unique(strains.fac))]
-
-  
-clab<-cbind(treat.col,strains.col)
-colnames(clab)<-c('Treatment','Strain/Mutant')
-
-
-hmap<-heatmap3(as.matrix(heatshape),
-               scale = 'row',
-               #hclustfun = function(x) hclust(dist(x,method="manhattan"),method="complete"),
-               #distfun = function(x) dist(x,method="manhattan"),
-               #labRow=FALSE,
-               #key=TRUE,
-               #key.title='Z-score',
-               #ColSideLabs = 'Group',
-               ColSideColors = clab)
-legend('topleft',legend=legtxt,fill=legcol, border=FALSE, bty="n",title='Strain/Mutant')
-legend('left',legend=c('Treatment','Control'),fill=c('black','white'), border=TRUE, bty="n",title='Drug')
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Heatmap_OP50-OP50-MR.pdf",sep=''),
+             width=8,height=9, useDingbats=FALSE)
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Heatmap.pdf",sep=''),
@@ -331,9 +213,10 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-ggplot(met.clean,aes(x=Clean.name,y=logConc,color=Metformin_mM))+
+
+ggplot(met,aes(x=`Clean name`,y=logConc,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
+  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +
   geom_point()+
   geom_text(aes(label=Replicate),color='black',size=2)+
   scale_y_continuous(breaks=seq(-3,8,by=1) )+
@@ -346,9 +229,9 @@ dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Raw_logConc_by_treatment.pdf",sep=''),
              width=25,height=10, useDingbats=FALSE)
 
-ggplot(met.clean,aes(x=Clean.name,y=Conc,color=Metformin_mM))+
+ggplot(met,aes(x=`Clean name`,y=Conc,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
+  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +
   geom_point()+
   geom_text(aes(label=Replicate),color='black',size=2)+
   ylab('Concentration, nmol')+
@@ -362,9 +245,9 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-ggplot(met.clean,aes(x=Strain,y=logConc,color=Metformin_mM))+
+ggplot(met,aes(x=Strain,y=logConc,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
+  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +
   geom_point()+
   scale_y_continuous(breaks=seq(-5,15,by=1))+
   geom_text(aes(label=Replicate),color='black',size=2)+
@@ -382,46 +265,32 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-
-
-head(met)
-
-
-unique(as.character(met$Group))
-
-#Summarise manually
-
-met.mes<-melt(met.clean,measure.vars = c('Conc','logConc'),variable.name = 'Measure',value.name = 'Value')
-head(met.mes)
-
 #Concentrations by groups
-summary<-ddply(met.mes,.(Metabolite,Common.name,Clean.name,Strain,Metformin_mM,Group,Measure),summarise,Mean=mean(Value),SD=sd(Value))
-sum.m<-melt(summary,measure.vars = c('Mean','SD'),variable.name = 'Stat',value.name = 'Value')
-
-sum.m$Index<-paste(sum.m$Group,sum.m$Clean.name,sep=' ')
 
 
-sum.c<-dcast(sum.m,Metabolite+Strain+Metformin_mM+Group+Index~Measure+Stat,value.var = 'Value',drop = TRUE)
-sum.c$VarPrc<-(2^(sum.c$logConc_SD)-1)*100
+
+sum.c<-met %>%
+  group_by(Metabolite,`Common name`,`Clean name`,Strain,Metformin_mM,Group) %>%
+  summarise(Mean=mean(logConc),
+            SD=sd(logConc)) %>%
+  mutate(Index=paste(Group,Metabolite),
+         VarPrc=ifelse(is.na(SD) ,Inf, (2^(SD)-1)*100 ) ) %>%
+  #Reorder, then preserve order with factor levels
+  arrange(VarPrc)%>%
+  data.frame %>%
+  mutate(Index=factor(Index, levels=Index,labels=Index)) 
 
 
-#Find outliers in most variable groups
-indxord<-sum.c[order(sum.c$logConc_SD),'Index']
-sum.c$Index<-factor(sum.c$Index,levels=indxord,labels=indxord)
+sum.c %>%
+  filter(VarPrc>300)
 
-ggplot(sum.c,aes(x=Index,y=logConc_SD))+
-  geom_point()+
-  coord_flip()
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Ingroup_variation_logConc_SD.pdf",sep=''),
-             width=7,height=30, useDingbats=FALSE)
 
 ggplot(sum.c,aes(x=Index,y=VarPrc))+
   geom_point()+
-  scale_y_continuous(breaks = seq(0,100,by=5))+
+  scale_y_continuous(breaks = seq(0,1000,by=25),limits=c(0,100))+
   ylab('In-group variation, %')+
   coord_flip()
+
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Ingroup_variation_Percentage.pdf",sep=''),
@@ -445,85 +314,51 @@ sel.groups
 
 #Linear modelling
 
-lmshape<-dcast(met.clean,Group+Replicate~Metabolite,value.var = 'logConc',drop=TRUE)
-#lmshape$Sample<-lmshape$Group
-head(lmshape)
+contrasts<-read.contrasts2('!Contrasts_Celegans_FA_metabolomics.xlsx')
+contrasts$Contrasts.table
 
-lmshape<-subset(lmshape,Group %in% sel.groups)
+#Can be extended to include extra info that will be passed to results
+contrasts.desc<-contrasts$Contrasts.table %>%
+  select(-c(Target:Reference))
 
-unique(lmshape$Group)
-
-
-metabolites<-setdiff(colnames(lmshape),c('Sample','Group','Replicate'))
-
-
-
-
-contrasts<-read.contrasts('!Contrasts_Celegans_FA_metabolomics.xlsx','Contrasts_values',sel.groups)
-contrasts.table<-contrasts$Contrasts.table
 contr.matrix<-contrasts$Contrasts.matrix
-
-strainlist<-c('OP50','OP50-MR','OP50-crp','nhr-49')
-contrasts.table$Strain
-
-contrasts.table$Strain<-factor(contrasts.table$Strain,levels=strainlist,labels=strainlist) #
 contr.matrix
 
 
-allresults<-hypothesise(lmshape,metabolites,contr.matrix,formula="0+Group")
-
-
-results<-merge(allresults$All,contrasts.table[,c('Contrast','Description','Contrast_type','Strain')],by='Contrast',all.x=TRUE)
-
-results<-rename(results,c("Variable"="Metabolite"))
-
-results.a<-merge(results,met.c,by='Metabolite')
+#Need to define grouping and variables
+results.all<-met %>%
+  group_by(Metabolite,`Common name`,`Clean name`) %>%
+  do(hypothesise2(.,"logConc~0+Group",contr.matrix)) %>%
+  getresults(contrasts.desc)
 
 
 
+results<-results.all$results
+results.cast<-results.all$cast
+results.castfill<-results.all$castfull
 
 
-results.m<-melt(results.a,measure.vars = c('logFC','p.value','SE','t.value','PE','NE','FDR','logFDR'),variable.name = 'Stat',value.name = 'Value')
-
-
-head(results.m)
-results.castfull<-dcast(results.m,Metabolite+Common.name+Clean.name+Conc_Mean+Conc_SD+logConc_Mean+logConc_SD~Contrast+Stat,value.var = 'Value')
-results.cast<-dcast(subset(results.m,Stat %in% c('logFC','FDR')),Metabolite+Common.name+Conc_Mean+Conc_SD+logConc_Mean+logConc_SD~Contrast+Stat,value.var = 'Value')
-
-
-
-head(results.castfull)
-head(results.cast)
-
-
-
-results.exp<-results.a[,c('Contrast','Description','Contrast_type','Strain','Metabolite','Common.name','logFC','FDR','p.value','SE','PE','NE','t.value')]
-head(results.exp)
-
-
-write.csv(results.exp,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
+write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/All_results_sidebyside.csv',sep=''),row.names = FALSE)
 write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full.csv',sep=''),row.names = FALSE)
 
 
+#grp.vals<-c('Metabolite','Clean name','Common name')
+
+cnt.vals<-results %>%
+  select(-one_of('Metabolite','Clean name','Common name') ) %>%
+  colnames(.)
+
+results.int<-results %>%
+  rename_(.dots = setNames(cnt.vals, paste0('x_',cnt.vals))) %>%
+  full_join(results %>%
+              rename_(.dots = setNames(cnt.vals, paste0('y_',cnt.vals)))) %>%
+  full_join(results %>%
+              rename_(.dots = setNames(cnt.vals, paste0('z_',cnt.vals)))) %>%
+  select(Metabolite:`Clean name`,everything())
 
 
-contrs<-unique(as.character(results$Contrast))
-stats<-c('logFC','FDR','PE','NE')
 
-contcombs<-apply(expand.grid(contrs, stats), 1, paste, collapse="_")
-
-
-
-results.cm<-subset(results.a,Contrast=='C_T-C_C')
-
-
-results.jT<-merge(results.cm,subset(results,Contrast_type=='Treatment' & Contrast!='C_T-C_C'),by='Metabolite',suffixes = c('_C',''),all.y=TRUE)
-
-
-
-
-head(results.jT)
 #Plotting starts
 
 erralpha<-0.6
@@ -537,14 +372,18 @@ maincomp<-'Interaction strength'
 
 gradcols<-c('blue4','blue','gray80','red','red4')
 
-ggplot(results.jT,aes(x=logFC_C,y=logFC,color=logFC-logFC_C))+
+
+results.int %>%
+  filter(x_Contrast=='C_T-C_C' & y_Contrast_type=='Treatment' & z_Contrast_type=='Interaction' & y_Strain==z_Strain) %>%
+  mutate(y_Strain=factor(y_Strain,levels=c('OP50-MR','OP50-crp','nhr-49')) ) %>%
+  ggplot(aes(x=x_logFC,y=y_logFC,color=z_logFC))+
   geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
-  geom_errorbarh(aes(xmin=NE_C,xmax=PE_C),alpha=erralpha,color=errcolor,height=0)+
-  geom_errorbar(aes(ymin=NE,ymax=PE),alpha=erralpha,color=errcolor,width=0)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor)+
+  geom_errorbar(aes(ymin=y_NE,ymax=y_PE),alpha=erralpha,color=errcolor)+
   geom_point()+
-  geom_text_repel(aes(label=Clean.name),
+  geom_text_repel(aes(label=`Clean name`),
                   size=lblsize,
                   force=2,
                   segment.colour=errcolor,
@@ -553,100 +392,84 @@ ggplot(results.jT,aes(x=logFC_C,y=logFC,color=logFC-logFC_C))+
   ylab('Metformin effect on other strain')+
   scale_colour_gradientn(colours = gradcols,
                          breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
-  facet_wrap(~Strain)+
-  theme(panel.grid.minor = element_blank())
-
+  theme(panel.grid.minor = element_blank())+
+  facet_wrap(~y_Strain)
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Scatter_treatment.pdf',sep = ''),
              width=24,height=6,useDingbats=FALSE)
 
 
+VolcanoPlot<-function(data) {
+  data %>%
+    ggplot(aes(x=logFC,y=logFDR,color=Strain))+
+    geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
+    geom_errorbarh(aes(xmin=NE,xmax=PE),alpha=erralpha,color=errcolor,height=0)+
+    geom_point()+
+    ylim(0,15)+
+    geom_text_repel(aes(label=ifelse(FDR <0.05,as.character(`Clean name`),'')),size=2)+
+    facet_wrap(~Description)
+}
 
-ggplot(subset(results.a,Contrast_type=="Treatment"),aes(x=logFC,y=logFDR,color=Strain))+
-  geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-  geom_errorbarh(aes(xmin=NE,xmax=PE),alpha=erralpha,color=errcolor,height=0)+
-  geom_point(aes(size=Conc_Mean))+
-  ylim(0,15)+
-  labs(size='Average metabolite\nconcentration, nmol')+
-  ggtitle('Metformin treatment effect in different strains')+
-  geom_text_repel(aes(label=ifelse(FDR <0.05,as.character(Clean.name),'')),size=2)+
-  facet_wrap(~Description)
+results %>%
+  filter(Contrast_type=="Treatment") %>%
+  VolcanoPlot+
+  ggtitle('Metformin treatment effect in different strains')
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_treatment.pdf',sep = ''),
              width=12,height=9,useDingbats=FALSE)
 
-
-ggplot(subset(results.a,Contrast_type %in% c("Bacterial mutant","Worm mutant") ),aes(x=logFC,y=logFDR,color=Strain))+
-  geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-  geom_errorbarh(aes(xmin=NE,xmax=PE),alpha=erralpha,color=errcolor,height=0)+
-  geom_point(aes(size=Conc_Mean))+
-  ylim(0,15)+
-  labs(size='Average metabolite\nconcentration, nmol')+
-  ggtitle('Mutant difference vs OP50')+
-  geom_text_repel(aes(label=ifelse(FDR <0.05,as.character(Clean.name),'')),size=2)+
-  facet_wrap(~Description)
+results %>%
+  filter(Contrast_type %in% c("Bacterial mutant","Worm mutant") ) %>%
+  VolcanoPlot +
+  ggtitle('Differences between bacterial/worm strains')
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_mutant.pdf',sep = ''),
              width=12,height=6,useDingbats=FALSE)
 
 
-
-
-ggplot(subset(results.a,Contrast_type=="Interaction"),aes(x=logFC,y=logFDR,color=Strain))+
-  geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-  geom_errorbarh(aes(xmin=NE,xmax=PE),alpha=erralpha,color=errcolor,height=0)+
-  geom_point(aes(size=Conc_Mean))+
-  labs(size='Average metabolite\nconcentration, nmol')+
-  #ylim(0,10)+
-  ggtitle('Interaction between treatment and strain in comparison to OP50 (N2)')+
-  geom_text_repel(aes(label=ifelse(FDR <0.05,as.character(Clean.name),'')),size=2)+
-  facet_wrap(~Description)
+results %>%
+  filter(Contrast_type %in% c("Interaction") ) %>%
+  VolcanoPlot +
+  ggtitle('Interaction between treatment and strain in comparison to OP50 (N2)')
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_interaction_treatment-strain.pdf',sep = ''),
              width=12,height=6,useDingbats=FALSE)
 
-
-# 
-# 
-# ggplot(subset(results.jT,Contrast_type=="Treatment"),aes(x=Conc_Mean,y=logFC,color=Strain))+
-#   #geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-#   geom_errorbarh(aes(xmin=Conc_Mean-Conc_SD,xmax=Conc_Mean+Conc_SD),alpha=erralpha,color=errcolor,height=0)+
-#   geom_errorbar(aes(ymin=NE,ymax=PE),alpha=erralpha,color=errcolor,height=0)+
-#   geom_point(aes(size=Conc_Mean))+
-#   scale_x_log10(
-#     breaks = scales::trans_breaks("log10", function(x) 10^x),
-#     labels = scales::trans_format("log10", scales::math_format(10^.x)) )+
-#   scale_size_continuous(breaks=seq(0,200,by=50))+
-#   xlab('Average metabolite\nconcentration, nmol')+
-#   labs(size='Average metabolite\nconcentration, nmol')+
-#   ggtitle('Correlation between absolute concentration and fold changes')+
-#   geom_text_repel(aes(label=Metabolite),
-#                   size=lblsize,
-#                   force=2,
-#                   segment.colour=errcolor,
-#                   segment.alpha =erralpha)+
-#   annotation_logticks(sides="b")+
-#   facet_wrap(~Description)
-# 
-# dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Correlation_between_conc_and_logFC.pdf',sep = ''),
-#              width=12,height=6,useDingbats=FALSE)
-# 
 
 
 
 #Heatmap for summary
 
 
-unique(as.character(results.a$Description))
+unique(as.character(results$Description))
 
 comparisons<-c("Treatment effect on OP50","Treatment effect on OP50-MR","Treatment effect on OP50-crp","Treatment effect for nhr-49",
                "Mutant difference for OP50-MR","Mutant difference for OP50-crp","Mutant difference for nhr-49")
 
 
 
-heatsum<-dcast(results.a,Clean.name~Description,value.var = 'logFC')
+
+fig2conts<-c('C_T-C_C','MR_T-MR_C','nhr49_T-nhr49_C','MR_C-C_C','nhr49_C-C_C')
+
+fig6conts<-c('C_T-C_C','MR_T-MR_C','crp_T-crp_C','MR_C-C_C','crp_C-C_C')
+
+contsel<-fig6conts
+
+heatsum<-results %>%
+  filter(Contrast %in% contsel) %>%
+  select(`Clean name`,Description,logFC) %>%
+  spread(Description,logFC) %>%
+  data.frame
+
+
 rownames(heatsum)<-heatsum$Clean.name
 heatsum$Clean.name<-NULL
+
+
+d<-dist(as.matrix(heatsum),method = "euclidean")
+h<-hclust(d,method="ward.D2")
+ordmet<-rownames(heatsum[h$order,])
+
 
 
 amp<-4
@@ -656,7 +479,6 @@ maxv<- amp
 
 nstep<-maxv-minv
 
-
 clrbrks<-seq(-amp,amp,by=2)
 
 brks<-seq(minv,maxv,by=(maxv-minv)/(nstep))
@@ -665,46 +487,30 @@ bgg <- colorRampPalette(c("blue", "gray90", "red"))(n = nstep)
 clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
 
 
-reorderfun_mean = function(d,w) { reorder(d, w, agglo.FUN = mean) }
-
-hm<-heatmap3(as.matrix(heatsum),key=TRUE,Colv=FALSE,trace='none',col=bgg,
-             xlab='Comparison',Rowv=TRUE,breaks = brks,dendrogram="row",scale="none")
-
-hm
-
-
-ordmet<-rownames(heatsum[hm$rowInd,])
-
-
-if (length(ordmet)!=length(unique(ordmet))){
-  print("Non unique metabolites!")
-}
-
-
-results.a$Metabolite<-factor(results.a$Clean.name,levels=ordmet,labels=ordmet)
-results.a$Description<-factor(results.a$Description,levels=comparisons,labels=comparisons)
-results.a$FDRstars<-stars.pval(results.a$FDR)
-
-
-
-ggplot(subset(results.a,Description %in% comparisons),aes(x=Description,y=Metabolite))+
+results %>%
+  filter(Contrast %in% contsel) %>%
+  mutate(`Clean name`=factor(`Clean name`,levels=ordmet)) %>%
+  ggplot(aes(x=Description,y=`Clean name`))+
   geom_tile(aes(fill=logFC))+
   #geom_point(aes(size=FDRc,colour=logFC),alpha=0.9)+
   theme_minimal()+
-  geom_text(aes(label=as.character(FDRstars)))+
+  geom_text(aes(label=as.character(FDRStars)))+
   #scale_size_discrete(range = c(2,4))+#,breaks=brks
   scale_fill_gradientn(colours = clrscale,
                        breaks=clrbrks,limits=c(-amp,amp))+
   #scale_fill_gradient2(low = "purple", mid = "gray", high = "red", midpoint = 0, breaks = clrbrks)+
   xlab("Comparison")+
+  ylab('Fatty acid')+
   theme(axis.ticks=element_blank(),
         panel.border=element_blank(),
         panel.grid.minor = element_blank(),
         panel.grid.major = element_blank(),
         axis.text.x = element_text(angle = 90, hjust = 1))
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap.pdf',sep = ''),
-             width=6,height=9,useDingbats=FALSE)
+
+
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig6.pdf',sep = ''),
+             width=5,height=8,useDingbats=FALSE)
 
 
 
