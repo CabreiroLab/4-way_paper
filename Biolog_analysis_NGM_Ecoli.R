@@ -12,8 +12,6 @@ library(circlize)
 #devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-
-
 library(ggthemes)
 
 theme_Publication <- function(base_size=14) {
@@ -86,27 +84,6 @@ info<-read_csv('../Biolog/Biolog_metabolites_EcoCyc_Unique_PM1-PM5.csv') %>%
 head(info)
 
 
-# info<-info %>%
-#   mutate(Metabolite=trimws(as.character(Metabolite)),
-#          Name=trimws(as.character(Name)),
-#          MetaboliteU=ifelse(Metabolite=='Negative Control','NGM',Metabolite),
-#          MetaboliteU=ifelse(Metabolite %in% dupls & Plate %in% c('PM3B'),
-#                                 paste(Metabolite,'N',sep='_'),MetaboliteU),
-#          MetaboliteU=ifelse(Metabolite %in% dupls & Plate %in% c('PM4A') & Group=='P-Source',
-#                                 paste(Metabolite,'P',sep='_'),MetaboliteU),
-#          MetaboliteU=ifelse(Metabolite %in% dupls & Plate %in% c('PM4A') & Group=='S-Source',
-#                                 paste(Metabolite,'S',sep='_'),MetaboliteU),
-#          MetaboliteU=ifelse(Index=='PM1-A1','NGM_C1',MetaboliteU),
-#          MetaboliteU=ifelse(Index=='PM2A-A1','NGM_C2',MetaboliteU),
-#          MetaboliteU=ifelse(Index=='PM3B-A1','NGM_N',MetaboliteU),
-#          MetaboliteU=ifelse(Index=='PM4A-A1','NGM_P',MetaboliteU),
-#          MetaboliteU=ifelse(Index=='PM4A-F1','NGM_S',MetaboliteU)) %>%
-#   rename(Metabolite_class=Description)
-# 
-# 
-# head(info)
-
-
 
 #Get data
 
@@ -118,15 +95,17 @@ data<-read_csv('Data/Summary.csv') %>%
                         levels=c("OP50Sens_C","OP50Sens_T"),
                         labels=c("OP50Sens_C","OP50Sens_T"))) %>%
   left_join(info[,c('Index','MetaboliteU')],by='Index') %>%
-  rename(Metabolite=Name,G=Int_750nm_log,GR=a_log) %>%
-  select(File:Metformin_mM,Replicate,Well,Index,Sample:MetaboliteU,Metabolite:Group,G,GR) %>%
-  gather(key=Measure,value=Value,G,GR) %>%
+  select(File:Metformin_mM,Replicate,Well,Index,Sample:MetaboliteU,Metabolite=Name,EcoCycID:Group,G=Int_750nm_log,GR=a_log) %>%
+  gather(Measure,Value,G,GR) %>%
   group_by(Plate,Type,Replicate,Group,Measure) %>%
   mutate(Value_ref=Value[Metabolite=='Negative Control'],
          Value_norm=Value-Value_ref) %>%
   ungroup %>%
   mutate_at(c('SampleID','Sample','Strain','Metformin_mM'),as.factor)
 
+
+
+View(data)
 
 data.nc<-data %>%
   filter(Metabolite!='Negative Control' & Plate !='PM5')
@@ -319,6 +298,7 @@ write.csv(results.castfull,paste(odir,'/Ecoli_results_sidebyside_full.csv',sep='
 
 
 
+
 results.celr<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv') %>%
   filter(! Index %in% c('Controls-A1','Controls-B1')) %>%
   select(Index,logFC:logFDR_bin)
@@ -332,8 +312,9 @@ results.cels<-results.celr %>%
 #Main data
 results.castcomb<-results.castfull %>%
   left_join(results.cels) %>%
-  arrange(desc(`T-C_logFC`)) %>%
-  mutate(MetaboliteU=factor(MetaboliteU,labels=MetaboliteU))
+  arrange(desc(`T-C_logFC`))
+
+View(results.castcomb)
 
 
 #With growth rate
@@ -366,11 +347,10 @@ selectcast.c<-subset(results.castcomb.c,MetaboliteU %in% selmets$MetaboliteU )
 dim(selectcast)
 
 metorder<-as.character(results.castcomb$MetaboliteU)
-data.nc<-data.nc %>%
-  mutate(MetaboliteU=factor(MetaboliteU,levels=metorder))
 
 data.nc %>%
   filter(Measure=='G') %>%
+  mutate(MetaboliteU=factor(MetaboliteU,levels=metorder)) %>%
   ggplot(aes(x=MetaboliteU,y=Value_norm,color=Type))+
   geom_hline(yintercept = 0,color='red',alpha=0.5)+
   stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +

@@ -1,15 +1,8 @@
 library(tidyverse)
-
-
 library(ggrepel)
 
 
-
-
-
-#library(limma)
-
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
@@ -72,18 +65,34 @@ theme_set(theme_Publication())
 cwd<-"~/Dropbox/Projects/2015-Metformin/Biolog_Met_NGM/"
 setwd(cwd)
 
-
+#load('Biolog_combined.RData')
+#save.image('Biolog_combined.RData')
 
 odir<-'Summary'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
+
+info<-read_csv('../Biolog/Biolog_metabolites_EcoCyc_Unique_PM1-PM5.csv') %>%
+  filter(Plate %in% c('PM1','PM2A','PM3B','PM4A'))
+
+
 PM1PM2<-subset(info,Plate %in% c('PM1','PM2A'))
 
+results.in<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv')
 
-results.in<-read.csv('Celegans/Summary/Celegans_results_withNGM.csv')
 
-results.castcomb<-read.csv('Summary/Combined_results_sidebyside_full.csv')
+
+logFDRbreaks<-c(-1,1.3,2,3,14)
+logFDRbins<-c('N.S.','p<0.05','p<0.01','p<0.001')
+
+
+
+
+
+
+
+results.castcomb<-read_csv('Summary/Combined_results_sidebyside_full.csv')
 
 data.Isum<-readRDS('Celegans/Celegans_fluorescence_distributions.rds')
 
@@ -108,31 +117,162 @@ tsum<-ectimem %>%
 
 #Pick data to show
 
+logFDRbreaks<-c(-1,1.3,2,3,14)
+logFDRbins<-c('N.S.','p<0.05','p<0.01','p<0.001')
+
+logFDRbinsl<-c('N.S.','<0.05','<0.01','<0.001')
+
 #Carboxylic acids to remove
 coxy<-c('Itaconic Acid','Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')
 
-selectcast<-subset(results.castcomb,!(Plate %in% c('PM3B','PM4A') & Metabolite %in% PM1PM2$Metabolite ) & !Metabolite %in% c('Negative Control',coxy) )
+selmets<-info %>%
+  filter(!(Plate %in% c('PM3B','PM4A') &
+             Metabolite %in% PM1PM2$Metabolite ) &
+           !Metabolite %in% c('Negative Control',coxy))
+
+selectcast<-results.castcomb %>%
+  filter(MetaboliteU %in% selmets$MetaboliteU) %>%
+  arrange(`T-C_logFC`)%>%
+  mutate(MetaboliteU=factor(MetaboliteU,levels=MetaboliteU),
+         Order=row_number()) %>%
+  mutate_at(c('T-C_logFDR_bin','Cel_logFDR_bin'),funs(factor(.,levels=logFDRbins,labels=logFDRbinsl)))
+
+View(selectcast)
+
+metorder<-as.character(selectcast$MetaboliteU)
+
+
+results.cel<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv')%>%
+  filter(! Index %in% c('Controls-A1','Controls-B1')) %>%
+  select(Index,logFC:logFDR_bin) %>%
+  left_join(info) %>%
+  mutate(Organism='C. elegans',
+         logFCrev=-logFC,
+         PErev=-NE,
+         NErev=-PE) %>%
+  select(Organism,Plate,Well,Index,MetaboliteU,logFC=logFCrev,SE,PE=PErev,NE=NErev,FDR,logFDR)
+
+results.eco<-read_csv('Summary/Ecoli_results.csv') %>%
+  filter(Measure=='G')
+
+
+results.ecocel<-results.eco %>%
+  filter( Contrast=='T-C' ) %>%
+  select(Plate,Well,Index,MetaboliteU,logFC,SE,PE,NE,FDR,logFDR) %>%
+  mutate(Organism='E. coli') %>%
+  rbind(results.cel) %>%
+  filter(MetaboliteU %in% selmets$MetaboliteU) %>%
+  mutate(MetaboliteU=factor(MetaboliteU,levels=metorder,labels=metorder),
+         logFDR_bin=cut(logFDR, breaks=logFDRbreaks,labels=logFDRbinsl),
+         Organism=factor(Organism,levels=c('E. coli','C. elegans') ) ) %>%
+  group_by(Organism) %>%
+  arrange(logFC) %>%
+  mutate(Order=row_number()) %>%
+  ungroup
+
+
+View(selectcast)
 
 
 
-ecolisum<-results.castcomb %>%
-  select(Index,Metabolite,MetaboliteU,contains('T_G'),contains('C_G')) %>%
-  gather(Type,Value,contains('T_G'),contains('C_G')) %>%
-  separate(Type,c('Type','Measure','Stat'),sep='_',remove=TRUE) %>%
-  spread(Stat,Value)
 
 
-ggplot(selectcast,aes(x=MetaboliteU,y=`T-C_logFC`,color=`T-C_logFDR_bin`))+
+selectcast %>%
+  arrange(`T-C_logFC`) %>%
+  select(MetaboliteU,Order,`T-C_logFC`,`T-C_FDR`,`T-C_logFDR`,`T-C_logFDR_bin`,Cel_logFC,Cel_logFDR_bin)
+
+
+results.ecocel %>%
+  #filter(Organism=='E. coli') %>%
+  #arrange(Order) %>%
+  #mutate(MetaboliteU=factor(MetaboliteU,levels=metorder,labels=metorder)) %>%
+  ggplot(aes(y=MetaboliteU,x=logFC,color=logFDR_bin))+
+  geom_vline(xintercept = 0,color='red',alpha=0.5)+
+  geom_errorbarh(aes(xmin=NE,xmax=PE),height=0.5)+
+  geom_point(size=1)+
+  ylab('Metabolite')+
+  xlab('logFC')+
+  labs(color='FDR')+
+  scale_colour_manual(values = c("gray40", "red4", "red3",'red'))+
+  scale_x_continuous(breaks=seq(-10,10) )+
+  theme(axis.ticks.y=element_blank(),
+        axis.line = element_line(colour = NA),
+        axis.line.x = element_line(colour = NA),
+        axis.line.y = element_line(colour = NA),
+        #panel.border=element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank())+
+  facet_grid(~Organism)
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/EcoliCelegans_logFC_tall_Treatment.pdf",sep=''),
+             width=9,height=50)
+
+
+
+
+results.ecocel %>%
+  #filter(Organism=='E. coli') %>%
+  #arrange(Order) %>%
+  #mutate(MetaboliteU=factor(MetaboliteU,levels=metorder,labels=metorder)) %>%
+  ggplot(aes(y=MetaboliteU,x=logFC,color=logFDR_bin))+
+  geom_vline(xintercept = 0,color='red',alpha=0.5)+
+  geom_errorbarh(aes(xmin=NE,xmax=PE),height=0,size=0.5)+
+  geom_point(size=0.5)+
+  ylab('Metabolites')+
+  xlab('logFC')+
+  labs(color='FDR')+
+  scale_colour_manual(values = c("gray40", "red4", "red3",'red'))+
+  scale_x_continuous(breaks=seq(-10,10,by=2) )+
+  theme(axis.ticks.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.line = element_line(colour = NA),
+        axis.line.x = element_line(colour = NA),
+        axis.line.y = element_line(colour = NA),
+        #panel.border=element_blank(),
+        panel.grid.minor.y = element_blank(),
+        panel.grid.major.y = element_blank())+
+  facet_grid(~Organism)
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/EcoliCelegans_logFC_tall_Treatment_tiny.pdf",sep=''),
+             width=5,height=5)
+
+
+
+
+
+selectcast  %>%
+  ggplot(aes(y=MetaboliteU,x=`T-C_logFC`,color=`T-C_logFDR_bin`))+
+    geom_vline(xintercept = 0,color='red',alpha=0.5)+
+    geom_errorbarh(aes(xmin=`T-C_NE`,xmax=`T-C_PE`))+
+    geom_point()+
+    ylab('Metabolite')+
+    xlab('Metabolite - metformin interaction as growth logFC vs NGM')+
+    labs(color='FDR')+
+    scale_colour_manual(values = c("gray40", "red4", "red3",'red'))
+
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Ecoli_logFC_tall_Treatment.pdf",sep=''),
+             width=9,height=50)
+
+selectcast %>%
+  arrange(Cel_logFC)%>%
+  mutate(MetaboliteU=factor(MetaboliteU,levels=MetaboliteU)) %>%
+  ggplot(aes(x=MetaboliteU,y=Cel_logFC,color=Cel_logFDR_bin))+
   geom_hline(yintercept = 0,color='red',alpha=0.5)+
-  geom_errorbar(aes(ymin=`T-C_NE`,ymax=`T-C_PE`))+
+  geom_errorbar(aes(ymin=Cel_NE,ymax=Cel_PE))+
   geom_point()+
   xlab('Metabolite')+
   ylab('Metabolite - metformin interaction as growth logFC vs NGM')+
-  labs(color='Significance (FDR)')+
+  labs(color='FDR')+
   scale_colour_manual(values = c("gray40", "red4", "red3",'red'))+
   coord_flip()
+
+
 dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Ecoli_logFC_tall_Growth.pdf",sep=''),
+             file=paste(odir,"/Celegans_logFC_tall_Fluorescence.pdf",sep=''),
              width=9,height=50)
 
 
@@ -167,7 +307,7 @@ gradcols<-c('blue4','blue','gray80','red','red4')
 
 
 
-ncontrol<-subset(results.castcomb,Metabolite=='Negative Control' )
+#ncontrol<-subset(results.castcomb,Metabolite=='Negative Control' )
 
 subset(selectcast,C_logFC<0 & C_FDR<0.05)
 
@@ -188,9 +328,7 @@ ymax<- 4
 thres<-0.05
 
 gradcols<-c('blue4','blue','gray80','red','red4')
-#gradcols<-c('green4','green','gray80','red','red4')
-#subset( ,Cel_logFC<0)
-#,C_logFC<0 & C_FDR<0.05 & T_logFC<0 & T_FDR<0.05)
+
 ggplot(selectcast,aes(y=T_logFC,x=C_logFC,color=-Cel_logFC))+
   geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
@@ -198,27 +336,15 @@ ggplot(selectcast,aes(y=T_logFC,x=C_logFC,color=-Cel_logFC))+
   geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
   geom_errorbar(aes(ymin=T_NE,ymax=T_PE),alpha=erralpha,color=errcolor,width=0)+
   geom_errorbarh(aes(xmin=C_NE,xmax=C_PE),alpha=erralpha,color=errcolor,height=0)+
-  #ggtitle(paste('Scatterplot of metformin and metabolite supplementation effects ',grp,sep='') )+
   ggtitle('Scatterplot of metformin and metabolite supplementation effects')+
-  #,subtitle = paste('Metabolites with FDR<',thres,' are marked',sep='')
   geom_point(size=3)+
-  # geom_point(aes(size=abs(`Cel_logFC`) ))+
   coord_cartesian(xlim=c(xmin,xmax),ylim = c(ymin,ymax))+
-  # scale_x_continuous(breaks=seq(-10,10,by=1))+
-  # scale_y_continuous(breaks=seq(-10,10,by=1))+
   xlab('Growth logFC vs NGM - Control')+
   ylab('Growth logFC vs NGM - +50mM Metformin')+
-  #eval(parse(text = intfdr)) < thres & abs( eval(parse(text = intvar)) ) > 0.75 
-  geom_text(aes(label=ifelse(Cel_logFC>0 & Cel_FDR<0.05, as.character(Metabolite_Uniq),"" ))  )+
-  # geom_text_repel(aes(label=ifelse(`G_T-C_FDR`<thres & abs(`G_T-C_logFC`)>0.5 & `G_T_logFC`>1, as.character(Metabolite_Uniq),'')),
-  #                 size=lblsize,nudge_y = 0.3,
-  #                 force=1,
-  #                 segment.colour=errcolor,
-  #                 segment.alpha =segalpha)+
+  geom_text_repel(aes(label=ifelse(abs(Cel_logFC)>0 & Cel_FDR<0.05, as.character(MetaboliteU),"" ))  )+
   scale_colour_gradientn(colours = gradcols,
                          breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
   labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  # scale_size(range = c(0.25, 7),name=maincomp)+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
@@ -234,8 +360,6 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 indxsel<-c('PM1-A1','PM1-A2','PM4A-E6','PM1-G7') #'Controls-A1',
-
-
 
 indxsel<-c('Controls-A1','PM1-A1','PM1-A2','PM1-G7','PM4A-E6')
 
@@ -262,10 +386,8 @@ data.Isel<-data.Isum %>%
   filter(Index %in% indxsel & Measure=='Absolute') %>%
   mutate(Metabolite=factor(Metabolite,levels=mlevels,labels=mlabels))
 
-
-
 ggplot(res.sel,aes(color=Type))+
-  geom_vline(xintercept=res.sel[res.sel$Index=='PM1-A1','Raw_Q90_Mean'],color='grey80',linetype='longdash')+
+  geom_vline(aes(xintercept=res.sel[res.sel$Index=='PM1-A1','Raw_Q90_Mean']),color='grey80',linetype='longdash')+
   geom_rect(aes(xmin=Raw_Q90_Mean-Raw_Q90_SE,xmax=Raw_Q90_Mean+Raw_Q90_SE,fill=Type),ymin=-Inf,ymax=Inf,alpha=0.2,color=NA)+
   geom_vline(aes(xintercept=Raw_Q90_Mean,color=Type))+
   geom_ribbon(data=data.Isel,aes(x=LogBrightness_num,ymin=(Mean-SD)*100,ymax=(Mean+SD)*100,fill=Type),alpha=0.5,color=NA)+
@@ -311,7 +433,7 @@ dev.copy2pdf(device=cairo_pdf,
 dwidth<-0.5
 
 ggplot(res.sel,aes(x=Metabolite,y=Raw_Q90_Mean,color=Type))+
-  geom_hline(yintercept=res.sel[res.sel$Index=='PM1-A1','Raw_Q90_Mean'],color='grey80',linetype='longdash')+
+  geom_hline(aes(yintercept=res.sel[res.sel$Index=='PM1-A1','Raw_Q90_Mean']),color='grey80',linetype='longdash')+
   scale_y_continuous(breaks=seq(-20,20,by=1),limits=c(-4,0))+
   geom_errorbar(aes(ymin=Raw_Q90_Mean-Raw_Q90_SE,ymax=Raw_Q90_Mean+Raw_Q90_SE),position = position_dodge(width = dwidth),width=0.25)+
   geom_point(position = position_dodge(width = dwidth),size=3)+
@@ -327,28 +449,33 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-
-
-data.sel<-ecolisum %>%
-  filter(Index %in% indxsel) %>%
-  mutate(Type=ifelse(Type=='C','Control','Treatment'),
-         Metabolite=factor(Metabolite,levels=mlevels,labels=mlabels))
-  
-  
-  
-ggplot(data.sel,aes(x=Metabolite,y=Mean,color=Type))+
-  geom_hline(yintercept=data.sel[data.sel$Index=='PM1-A1' & data.sel$Type=='Control','Mean'],color='grey80',linetype='longdash')+
-  #scale_y_continuous(breaks=seq(-20,20,by=1),limits=c(-4,0))+
-  geom_errorbar(aes(ymin=Mean-SE,ymax=Mean+SE),position = position_dodge(width = dwidth),width=0.25)+
-  geom_point(position = position_dodge(width = dwidth),size=3)+
-  ylab('log2 Growth AUC')+
-  theme(axis.text.x = element_text(angle = 90,hjust=1))
-
-
-dev.copy2pdf(device=cairo_pdf,
-             useDingbats=FALSE,
-             file=paste(odir,"/Summary_Ecoli_growth_comparison.pdf",sep=''),
-             width=5,height=5)
+# ecolisum<-results.eco %>%
+#   select(Index,Metabolite,MetaboliteU,contains('T_'),contains('C_G')) %>%
+#   gather(Type,Value,contains('T_G'),contains('C_G')) %>%
+#   separate(Type,c('Type','Measure','Stat'),sep='_',remove=TRUE) %>%
+#   spread(Stat,Value)
+# 
+# 
+# data.sel<-results. %>%
+#   filter(Index %in% indxsel) %>%
+#   mutate(Type=ifelse(Type=='C','Control','Treatment'),
+#          Metabolite=factor(Metabolite,levels=mlevels,labels=mlabels))
+#   
+#   
+#   
+# ggplot(data.sel,aes(x=Metabolite,y=Mean,color=Type))+
+#   geom_hline(yintercept=data.sel[data.sel$Index=='PM1-A1' & data.sel$Type=='Control','Mean'],color='grey80',linetype='longdash')+
+#   #scale_y_continuous(breaks=seq(-20,20,by=1),limits=c(-4,0))+
+#   geom_errorbar(aes(ymin=Mean-SE,ymax=Mean+SE),position = position_dodge(width = dwidth),width=0.25)+
+#   geom_point(position = position_dodge(width = dwidth),size=3)+
+#   ylab('log2 Growth AUC')+
+#   theme(axis.text.x = element_text(angle = 90,hjust=1))
+# 
+# 
+# dev.copy2pdf(device=cairo_pdf,
+#              useDingbats=FALSE,
+#              file=paste(odir,"/Summary_Ecoli_growth_comparison.pdf",sep=''),
+#              width=5,height=5)
 
 
 
