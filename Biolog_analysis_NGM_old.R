@@ -1,96 +1,21 @@
-#library(ggplot2)
-#library(plyr)
 library(tidyverse)
-
-library(gplots)
-library(gtools)
 library(ggrepel)
 
-library(reshape2)
-#library(tidyr)
+library(ComplexHeatmap)
+library(circlize)
+
+#library(RColorBrewer)
 
 
-library(heatmap3)
+#library(limma)
 
-
-
-
-#This should go with my package
-#library(multcomp)
-#library(contrast)
-
-
-
-
-library(RColorBrewer)
-
-
-#library(grid)
-#library(gridExtra)
-
-
-library(xlsx)
-
-library(ggthemes)
-
-library(limma)
-
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-#remove(hypothesise)
 
 
-MinMeanSDMMax <- function(x) {
-  v <- c(min(x), mean(x) - sd(x), mean(x), mean(x) + sd(x), max(x))
-  names(v) <- c("ymin", "lower", "middle", "upper", "ymax")
-  v
-}
 
-
-getinfo<-function(cof) {
-  df<-data.frame(cof)
-  df$Comparisons<-rownames(df)
-  return(df)
-}
-
-pole<-function(x,y) {
-  r<-sqrt(x^2+y^2)
-  o<- -2*atan(y/(x))/(pi/2)
-  return(o) 
-}
-
-
-lm_eqn = function(m) {
-  fres<-summary(m)
-  l <- list(a = format(abs(coef(m)[2]), digits = 2),
-            b = format(coef(m)[1], digits = 2),
-            r2 = format(summary(m)$r.squared, digits = 2),
-            p2 = format(pf(fres$fstatistic[1], fres$fstatistic[2], fres$fstatistic[3],lower.tail = FALSE)[[1]], digits = 2,scientific=TRUE));
-  
-  if (coef(m)[2] >= 0)  {
-    cof <- substitute(italic(y) == b + a %.% italic(x),l)
-    full <- substitute(italic(y) == b + a %.% italic(x)*","~~italic(r)^2~"="~r2*","~~italic(p)~"="~p2,l)
-  } else {
-    cof <- substitute(italic(y) == b - a %.% italic(x),l) 
-    full <- substitute(italic(y) == b - a %.% italic(x)*","~~italic(r)^2~"="~r2*","~~italic(p)~"="~p2,l)
-  }
-  
-  stat<-substitute(italic(r)^2~"="~r2*","~~italic(p)~"="~p2,l)
-  return(list('Coef'=as.character(as.expression(cof)),
-              'Stat'=as.character(as.expression(stat)),
-              'Full'=as.character(as.expression(full)),
-              'Atop'=as.character(as.expression(paste(cof,'\n',stat,sep='') ))))                 
-}
-
-
-getellipse<-function(x,y,sc=1) {
-  as.data.frame(ellipse::ellipse( cor(x, y),
-                                  scale=c(sd(x)*sc,sd(y)*sc),
-                                  centre=c( mean(x),mean(y)) ))
-}
-
-
+library(ggthemes)
 
 theme_Publication <- function(base_size=14) {
 
@@ -122,13 +47,16 @@ theme_Publication <- function(base_size=14) {
   
 }
 
+theme_set(theme_Publication())
+#theme_set(theme_light())
+
+
 
 pole<-function(x,y) {
   r<-sqrt(x^2+y^2)
   o<- -2*atan(y/(x))/(pi/2)
   return(o) 
 }
-
 
 pole2<-function(x,y) {
   o<- (atan(y/(x)))/(2*pi)
@@ -138,10 +66,6 @@ pole2<-function(x,y) {
 
 
 
-pearson<-function(x) as.dist((1-cor(t(x)))/2)
-
-theme_set(theme_Publication())
-#theme_set(theme_light())
 
 
 
@@ -157,107 +81,84 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
 
-info<-read.table('../Biolog/Biolog_metabolites_EcoCyc.csv',sep=',',quote = '"',header = TRUE) %>%
+info<-read_csv('../Biolog/Biolog_metabolites_EcoCyc_Unique_PM1-PM5.csv') %>%
   filter(Plate %in% c('PM1','PM2A','PM3B','PM4A'))
-
-
-dupmet<-data.frame(table(trimws(as.character(info$Metabolite))))
-dupls<-as.character(dupmet[dupmet$Freq>1,'Var1'])
-dupls
-
-info<-info %>%
-  mutate(Metabolite=trimws(as.character(Metabolite)),
-         Name=trimws(as.character(Name)),
-         Metabolite_Uniq=ifelse(Metabolite=='Negative Control','NGM',Metabolite),
-         Metabolite_Uniq=ifelse(Metabolite %in% dupls & Plate %in% c('PM3B'),
-                                paste(Metabolite,'N',sep='_'),Metabolite_Uniq),
-         Metabolite_Uniq=ifelse(Metabolite %in% dupls & Plate %in% c('PM4A') & Group=='P-Source',
-                                paste(Metabolite,'P',sep='_'),Metabolite_Uniq),
-         Metabolite_Uniq=ifelse(Metabolite %in% dupls & Plate %in% c('PM4A') & Group=='S-Source',
-                                paste(Metabolite,'S',sep='_'),Metabolite_Uniq),
-         Metabolite_Uniq=ifelse(Index=='PM1-A1','NGM_C1',Metabolite_Uniq),
-         Metabolite_Uniq=ifelse(Index=='PM2A-A1','NGM_C2',Metabolite_Uniq),
-         Metabolite_Uniq=ifelse(Index=='PM3B-A1','NGM_N',Metabolite_Uniq),
-         Metabolite_Uniq=ifelse(Index=='PM4A-A1','NGM_P',Metabolite_Uniq),
-         Metabolite_Uniq=ifelse(Index=='PM4A-F1','NGM_S',Metabolite_Uniq)) %>%
-  rename(Metabolite_class=Description)
-
 
 head(info)
 
 
-
-#Are ther still some duplicates?
-dupmet<-data.frame(table(info$Metabolite_Uniq))
-dupls<-as.character(dupmet[dupmet$Freq>1,'Var1'])
-dupls
-
-subset(info,Metabolite_Uniq %in% dupls)
+# info<-info %>%
+#   mutate(Metabolite=trimws(as.character(Metabolite)),
+#          Name=trimws(as.character(Name)),
+#          MetaboliteU=ifelse(Metabolite=='Negative Control','NGM',Metabolite),
+#          MetaboliteU=ifelse(Metabolite %in% dupls & Plate %in% c('PM3B'),
+#                                 paste(Metabolite,'N',sep='_'),MetaboliteU),
+#          MetaboliteU=ifelse(Metabolite %in% dupls & Plate %in% c('PM4A') & Group=='P-Source',
+#                                 paste(Metabolite,'P',sep='_'),MetaboliteU),
+#          MetaboliteU=ifelse(Metabolite %in% dupls & Plate %in% c('PM4A') & Group=='S-Source',
+#                                 paste(Metabolite,'S',sep='_'),MetaboliteU),
+#          MetaboliteU=ifelse(Index=='PM1-A1','NGM_C1',MetaboliteU),
+#          MetaboliteU=ifelse(Index=='PM2A-A1','NGM_C2',MetaboliteU),
+#          MetaboliteU=ifelse(Index=='PM3B-A1','NGM_N',MetaboliteU),
+#          MetaboliteU=ifelse(Index=='PM4A-A1','NGM_P',MetaboliteU),
+#          MetaboliteU=ifelse(Index=='PM4A-F1','NGM_S',MetaboliteU)) %>%
+#   rename(Metabolite_class=Description)
+# 
+# 
+# head(info)
 
 
 
 #Get data
 
-data.m<-read.table('Data/Summary.csv',sep=',',quote = '"',header = TRUE,check.names = FALSE) %>%
+data<-read_csv('Data/Summary.csv') %>%
   filter(Plate %in% c('PM1','PM2A','PM3B','PM4A')) %>%
   mutate(Sample=paste(Strain,ifelse(Type=='Control','C','T'),sep='_'),
          SampleID=paste(Sample,Replicate,sep='_'),
          Sample=factor(Sample,
                         levels=c("OP50Sens_C","OP50Sens_T"),
                         labels=c("OP50Sens_C","OP50Sens_T"))) %>%
-  left_join(info[,c('Index','Metabolite_Uniq')],by='Index') %>%
+  left_join(info[,c('Index','MetaboliteU')],by='Index') %>%
   rename(Metabolite=Name,G=Int_750nm_log,GR=a_log) %>%
-  select(File:Metformin_mM,Replicate,Well,Index,Sample:Metabolite_Uniq,Metabolite:Group,G,GR) %>%
-  gather(key=Measure,value=Value,G,GR)
-
-head(data.m)
-
-#Reference data
-NGMref<-data.m %>% 
-  filter(Metabolite=='Negative Control') %>%
-  rename(Value_ref=Value) %>%
-  select(Plate,Strain,Type,Replicate,Group,Measure,Value_ref)
+  select(File:Metformin_mM,Replicate,Well,Index,Sample:MetaboliteU,Metabolite:Group,G,GR) %>%
+  gather(key=Measure,value=Value,G,GR) %>%
+  group_by(Plate,Type,Replicate,Group,Measure) %>%
+  mutate(Value_ref=Value[Metabolite=='Negative Control'],
+         Value_norm=Value-Value_ref) %>%
+  ungroup %>%
+  mutate_at(c('SampleID','Sample','Strain','Metformin_mM'),as.factor)
 
 
-data.n<-data.m %>%
-  full_join(NGMref) %>%
-  mutate(Value_norm=Value-Value_ref)
-
-
-head(data.n)
-
-
-data.nc<-subset(data.n,Metabolite!='Negative Control' & Plate !='PM5')
+data.nc<-data %>%
+  filter(Metabolite!='Negative Control' & Plate !='PM5')
 
 PM1PM2<-subset(info,Plate %in% c('PM1','PM2A'))
 
-allindx<-unique(as.character(data.nc$Index))
+
+
+
+bioinfo<-data.nc %>%
+  group_by(SampleID,Sample,Strain,Metformin_mM) %>%
+  summarise %>%
+  ungroup %>%
+  data.frame
+
+rownames(bioinfo)<-bioinfo$SampleID
+
+
 
 pcashape<- data.nc %>%
   filter(Measure=='G') %>%
-  select(contains('Sample'),Metformin_mM,Strain,Index,Value_norm) %>%
-  spread(Index,Value_norm)
+  select(SampleID,Index,Value_norm) %>%
+  spread(Index,Value_norm) %>%
+  data.frame
 
-#pcashape<-dcast(subset(data.nc,Measure=='G'),Sample+SampleID~Index,value.var = 'Value_norm',drop=TRUE)
 
 rownames(pcashape)<-pcashape$SampleID
+pcashape$SampleID<-NULL
 
 
-samples<-pcashape$SampleID
-sampleclasses<-pcashape$Sample
-
-
-clean_data<-pcashape %>%
-  select(allindx)
-
-
-
-
-
-clean_data<-clean_data[,apply(clean_data,2,function(x) all(!is.na(x)) & !all(x==0)) ]
-
-
-hca_sample<-hclust(dist(clean_data,method="euclidean"),method="complete")
+hca_sample<-hclust(dist(pcashape,method="euclidean"),method="ward.D2")
 #hca_variable<-hclust(dist(t(log_data),method="manhattan"),method="complete")
 
 plot(hca_sample, labels=samples,
@@ -277,13 +178,13 @@ dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/PCA_components.pdf",sep=''),
              width=9,height=6)
 
+pcadata<-data.frame(ir.pca$x) %>%
+  rownames_to_column('SampleID') %>%
+  left_join(bioinfo)
 
 
 
-pcadata<-data.frame(ir.pca$x)
-pcadata[,c('SampleID','Sample','Strain','Metformin_mM')]<-pcashape[,c('SampleID','Sample','Strain','Metformin_mM')]
 
-#pcadata<-merge(data.frame(ir.pca$x),metslm[,c('Sample','Strain','Metformin_mM')],by = 0)
 
 pcaresult<-summary(ir.pca)$importance
 PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
@@ -292,22 +193,20 @@ PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
 
 
 ellipses<-pcadata %>%
-  group_by(Strain,Sample,Metformin_mM) %>%
-  do(data.frame(x=getellipse(.$PC1,.$PC2,1)$x,y=getellipse(.$PC1,.$PC2,1)$y ) ) %>%
+  group_by(Sample,Strain,Metformin_mM) %>%
+  do(getellipse(.$PC1,.$PC2,1) ) %>%
   data.frame
   
-
-#ddply(pcadata,.(Strain,Sample,Metformin_mM), plyr::summarise, x=getellipse(PC1,PC2,1)$x,y=getellipse(PC1,PC2,1)$y ) 
-
-pcadata$Metformin_mM<-as.factor(pcadata$Metformin_mM)
-ellipses$Metformin_mM<-as.factor(ellipses$Metformin_mM)
+# 
+# pcadata$Metformin_mM<-as.factor(pcadata$Metformin_mM)
+# ellipses$Metformin_mM<-as.factor(ellipses$Metformin_mM)
 
 ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
   xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
   ylab(paste('PC2 - ',PC2prc,'% of variance',sep=''))+
   geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Sample),linetype=Metformin_mM),size=1)+ 
   geom_point(aes(fill=factor( ifelse(Metformin_mM==0,Strain, NA ) ) ),size=5,stroke=1,shape=21)+
-  scale_linetype_manual("Drug, mM",values=c("0"=1,"50"=2))+
+  scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
   scale_fill_discrete(na.value=NA, guide="none")+
   guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
   #geom_text(aes(label=Sample))+
@@ -321,67 +220,45 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-# 
-# 
-# 
-# 
-# generalpca <- ggbiplot(ir.pca, obs.scale = 1,
-#                        var.scale = 1,
-#                        groups = sampleclasses,
-#                        ellipse = TRUE,
-#                        circle = TRUE,
-#                        var.axes = 0)+
-#   #   geom_vline(aes(xintercept=0),color='gray80')+
-#   #   geom_hline(aes(yintercept=0),color='gray80')+
-#   scale_color_discrete(name = '')+
-#   ggtitle('PCA')+
-#   theme(panel.grid.major = element_blank(),
-#         panel.grid.minor = element_blank())
-# generalpca
-# 
-# 
-# dev.copy2pdf(device=cairo_pdf,
-#              file=paste(odir,"/PCA.pdf",sep=''),
-#              width=6,height=4, useDingbats=FALSE)
-# 
-
 head(data.n)
 
 #Heatmap
-heatshape<- data.n %>%
-  filter(Metabolite!='Negative Control' & Measure=='G') %>%
-  select(SampleID,Metabolite_Uniq,Value_norm) %>%
-  spread(SampleID,Value_norm)
-
-#heatshape<-dcast(subset(data.n,Metabolite!='Negative Control' & Measure=='G'),Metabolite_Uniq~SampleID,value.var = 'Value_norm')
-
-
-rownames(heatshape)<-heatshape$Metabolite_Uniq
-
-heatshape$Metabolite_Uniq<-NULL
+heatshape<- data.nc %>%
+  filter(Measure=='G') %>%
+  select(SampleID,MetaboliteU,Value_norm) %>%
+  spread(SampleID,Value_norm) %>%
+  data.frame
 
 
+rownames(heatshape)<-heatshape$MetaboliteU
+
+heatshape$MetaboliteU<-NULL
 head(heatshape)
-#heatshape<-heatshape[apply(heatshape,1,function(x) all(!is.na(x))) ,]
-
-#Remove numbers from sample IDs
-groups<-gsub('_[[:digit:]]+', '', colnames(heatshape))
-annData<-factor(groups)
-#ColSideColors<-rainbow(length(unique(annData)))[as.numeric(annData)]
-
-ColSideColors<-rainbow(length(unique(annData)))[as.numeric(annData)]
-legtxt<-as.character(unique(annData))
-legcol<-rainbow(length(unique(annData)))[as.numeric(unique(annData))]
 
 
-hmap<-heatmap3(as.matrix(heatshape),
-               scale = 'row',
-               #hclustfun = function(x) hclust(dist(x,method="manhattan"),method="complete"),
-               #distfun = function(x) dist(x,method="manhattan"),
-               labRow=FALSE,
-               ColSideLabs = 'Group',
-               ColSideColors = ColSideColors,
-               legendfun=function() showLegend(legend=legtxt,col=legcol,cex=1))
+
+#Order anotation by heatmap colnames
+hanot<-bioinfo[colnames(heatshape),] %>%
+  select(Metformin_mM)
+
+ha<-HeatmapAnnotation(df=hanot, col = list(Metformin_mM=c('50'='black','0'='white')))
+
+heatshape.sc<-t(scale(t(heatshape)))
+
+rownames(heatshape.sc)<-NULL
+
+#make anotated heatmap
+Heatmap(heatshape.sc,name = 'Z-score',
+        #col=bgg4,
+        column_names_side = 'top',
+        clustering_method_rows='ward.D2',
+        #clustering_method_columns ='ward.D2',
+        top_annotation = ha,
+        row_dend_reorder = TRUE,
+        column_dend_reorder = TRUE,
+        row_names_max_width = unit(10, "cm"))
+
+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Heatmap.pdf",sep=''),
              width=6,height=9, useDingbats=FALSE)
@@ -398,112 +275,49 @@ head(data.nc)
 
 
 
-sel.samples<-unique(data.nc$Sample)
+contrasts<-read.contrasts2('!Contrasts.xlsx')
 
+contrasts.desc<-contrasts$Contrasts.table %>%
+  select(Description:Strain)
 
-
-
-contrasts<-read.contrasts('!Contrasts.xlsx','Contrasts_values',sel.samples)
-
-contrasts.table<-contrasts$Contrasts.table
 contr.matrix<-contrasts$Contrasts.matrix
 contr.matrix
 
-allresults<-data.frame()
+View(data.nc)
 
-#library(multcomp)
 
-meas<-'G'
-for (meas in c('G','GR')) {
-  
-  data.nsel<- data.n %>%
-    filter(Plate!='PM5' & Measure==meas) %>%
-    select(Metabolite,Sample,Replicate,Index,Value,Value_norm)
-  
-  #Data for negative control
-  lmshape.nc<-data.nsel %>%
-    filter(Metabolite=='Negative Control') %>%
-    select(Sample,Replicate,Index,Value) %>%
-    spread(Index,Value)
-  
-  
-  #dcast(subset(data.n,Name=='Negative Control' & Plate!='PM5' & Measure==meas),Sample+Replicate~Index,value.var = 'Value',drop=TRUE)
-  #Data for everything else
-  
-  if (meas=='G'){
-    lmshape.all<-data.nsel %>%
-      filter(Metabolite!='Negative Control') %>%
-      select(Sample,Replicate,Index,Value_norm) %>%
-      spread(Index,Value_norm)
-    
-    #lmshape.all<-dcast(subset(data.n,Name!='Negative Control' ),Sample+Replicate~Index,value.var = 'Value_norm',drop=TRUE)
-  } else {
-    lmshape.all<-data.nsel %>%
-      filter(Metabolite!='Negative Control') %>%
-      select(Sample,Replicate,Index,Value) %>%
-      spread(Index,Value)
-  }
-  
-  head(lmshape.nc)
-  head(lmshape.all)
-  
-  lmshape<-merge(lmshape.nc,lmshape.all,by=c('Sample','Replicate'))
-  lmshape$Sample<-as.factor(lmshape$Sample)
-
-  indexes<-setdiff(colnames(lmshape),c('Sample','Replicate'))
-  
-  #Needs multcomp, which masks dplyr functions
-  
-  allresults.n<-hypothesise(lmshape,indexes,contr.matrix,formula='0+Sample')$All
-  allresults.n$Measure<-meas
-  allresults<-rbind(allresults.n,allresults)
-} 
+results.all<-data.nc %>%
+  group_by(Measure,Group,Plate,Well,Index,Metabolite,MetaboliteU,EcoCycID,KEGG_ID) %>%
+  do(hypothesise2(.,'Value_norm~0+Sample',contr.matrix)) %>%
+  getresults(contrasts.desc)
 
 
 
 
-#Measure: Growth - G, Growth Rate - GR
-#meas<-'G'
 
 
-data.sum<-data.n %>%
+data.sum<-data.nc %>%
   filter(Plate!='PM5' & Measure=='G') %>%
-  group_by(Type,Index,Metabolite_Uniq) %>%
+  group_by(Type,Index,MetaboliteU) %>%
   summarise(G_Mean=mean(Value),G_SD=sd(Value),G_SE=G_SD/sqrt(length(Value))) %>%
   ungroup %>%
-  mutate(Type=ifelse(Type=='Control','C','T')) %>%
   data.frame
 
-head(data.sum)
-
-data.cast<-data.sum %>%
-  gather(Stat,Value,contains('G_')) %>%
-  unite(Type_Stat,Type,Stat) %>%
-  spread(Type_Stat,Value)
 
 
 
-results<-allresults %>%
-  left_join(contrasts.table[,c('Contrast','Description','Contrast_type')],by='Contrast') %>%
-  rename(Index=Variable) %>%
-  left_join(info[,c('Index','Plate','Well','Group','Metabolite','Metabolite_Uniq','KEGG_ID','EcoCycID','Metabolite_class')],by='Index') %>%
-  select(Contrast,Measure,Description,Contrast_type,Plate:Group,Index,Metabolite:Metabolite_class,logFC:logFDR)
-  
-results.m<-results %>%
-  gather(Stat,Value,logFC,p.value,SE,t.value,PE,NE,FDR,logFDR)
-
-#results.m<-melt(results,measure.vars = c('logFC','p.value','SE','t.value','PE','NE','FDR','logFDR'),variable.name = 'Stat',value.name = 'Value')
-
-
-head(results.m)
+results<-results.all$results
+head(results)
 
 logFDRbreaks<-c(-1,1.3,2,3,14)
 logFDRbins<-c('N.S.','p<0.05','p<0.01','p<0.001')
 
 
 
-results.castfull.c<-dcast(subset(results.m,Stat %in% c('logFC','SE','FDR','NE','PE','logFDR')),Index+Plate+Well+Metabolite+Metabolite_Uniq+KEGG_ID+EcoCycID+Group+Metabolite_class~Measure+Contrast+Stat,value.var = 'Value')
-results.cast.c<-dcast(subset(results.m,Stat %in% c('logFC','FDR')),Index+Plate+Well+Metabolite+Metabolite_Uniq+KEGG_ID+EcoCycID+Group+Metabolite_class~Measure+Contrast+Stat,value.var = 'Value')
+results.castfull
+
+.c<-dcast(subset(results.m,Stat %in% c('logFC','SE','FDR','NE','PE','logFDR')),Index+Plate+Well+Metabolite+MetaboliteU+KEGG_ID+EcoCycID+Group+Metabolite_class~Measure+Contrast+Stat,value.var = 'Value')
+results.cast.c<-dcast(subset(results.m,Stat %in% c('logFC','FDR')),Index+Plate+Well+Metabolite+MetaboliteU+KEGG_ID+EcoCycID+Group+Metabolite_class~Measure+Contrast+Stat,value.var = 'Value')
 
 results.castfull.c$G_logFDR_bin<-cut(results.castfull.c$`G_T-C_logFDR`, breaks=logFDRbreaks,labels=logFDRbins)
 results.castfull.c$GR_logFDR_bin<-cut(results.castfull.c$`GR_T-C_logFDR`, breaks=logFDRbreaks,labels=logFDRbins)
@@ -543,20 +357,9 @@ head(results.castfull)
 # 
 
 
-results.cast<-results.m %>%
-  filter(Stat %in% c('logFC','FDR') & Measure=='G') %>%
-  select(-Contrast_type,-Description,-Measure) %>%
-  unite(Contrast_Stat,Contrast,Stat) %>%
-  spread(Contrast_Stat,Value) %>%
-  left_join(data.cast)
-  
+results.cast<-results.all$cast
 
 
-
-
-
-results.exp<-results[,c('Contrast','Description','Contrast_type','Plate','Well','Group','Metabolite','Metabolite_Uniq','logFC','SE','PE','NE','t.value','p.value','FDR')]
-head(results.exp)
 
 
 
@@ -571,7 +374,7 @@ write.csv(results.castfull,paste(odir,'/Ecoli_results_sidebyside_full.csv',sep='
 
 
 
-results.cel.r<-read.csv('Celegans/Summary/Celegans_results_withNGM.csv') %>%
+results.cel.r<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv') %>%
   filter(! Index %in% c('Controls-A1','Controls-B1'))
 
 
@@ -595,6 +398,9 @@ results.cels<-results.cel[,c('Plate','Well',colnames(results.cel)[11:30])]
 head(results.cels)
 
 
+
+
+
 #Main data
 results.castcomb<-merge(results.castfull,results.cels,by=c('Plate','Well'),all=TRUE)
 
@@ -612,9 +418,9 @@ results.castcomb.c<-merge(results.castfull.c,results.cels,by=c('Plate','Well'))
 
 
 
-metorder<-as.character(results.castcomb[order(results.castcomb$`T-C_logFC`,decreasing = TRUE),'Metabolite_Uniq'])
+metorder<-as.character(results.castcomb[order(results.castcomb$`T-C_logFC`,decreasing = TRUE),'MetaboliteU'])
 
-results.castcomb$Metabolite_Uniq<-factor(results.castcomb$Metabolite_Uniq,levels=metorder,labels = metorder)
+results.castcomb$MetaboliteU<-factor(results.castcomb$MetaboliteU,levels=metorder,labels = metorder)
 
 
 head(results.castcomb)
@@ -625,8 +431,8 @@ write.csv(results.castcomb,paste(odir,'/Combined_results_sidebyside_full.csv',se
 
 
 #Only filtered
-metorder<-as.character(results.castcomb[order(results.castcomb$`T-C_logFC`,decreasing = TRUE),'Metabolite_Uniq'])
-results.castcomb$Metabolite_Uniq<-factor(results.castcomb$Metabolite_Uniq,levels=metorder,labels = metorder)
+metorder<-as.character(results.castcomb[order(results.castcomb$`T-C_logFC`,decreasing = TRUE),'MetaboliteU'])
+results.castcomb$MetaboliteU<-factor(results.castcomb$MetaboliteU,levels=metorder,labels = metorder)
 
 
 
@@ -670,12 +476,12 @@ cbrks<-seq(-amp,amp,by=1)
 gradcols<-c('blue4','blue','gray80','red','red4')
 
 
-metorder<-as.character(results.castcomb[order(results.castcomb$`T-C_logFC`),'Metabolite_Uniq'])
-#results.castcomb$Metabolite_Uniq<-factor(results.castcomb$Metabolite_Uniq,levels=metorder,labels = metorder)
-data.n$Metabolite_Uniq<-factor(data.n$Metabolite_Uniq,levels=metorder,labels=metorder)
+metorder<-as.character(results.castcomb[order(results.castcomb$`T-C_logFC`),'MetaboliteU'])
+#results.castcomb$MetaboliteU<-factor(results.castcomb$MetaboliteU,levels=metorder,labels = metorder)
+data.n$MetaboliteU<-factor(data.n$MetaboliteU,levels=metorder,labels=metorder)
 
 
-ggplot(subset(data.n,Measure=='G'),aes(x=Metabolite_Uniq,y=Value_norm,color=Type))+
+ggplot(subset(data.n,Measure=='G'),aes(x=MetaboliteU,y=Value_norm,color=Type))+
   geom_hline(yintercept = 0,color='red',alpha=0.5)+
   stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
   geom_point()+
@@ -688,9 +494,9 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 # 
-# metorder.sel<-as.character(selectcast[order(selectcast.c$`GR_T-C_logFC`),'Metabolite_Uniq'])
-# selectcast$Metabolite_Uniq<-factor(selectcast$Metabolite_Uniq,levels=metorder.sel,labels = metorder.sel)
-# ggplot(selectcast.c,aes(x=Metabolite_Uniq,y=`GR_T-C_logFC`,color=GR_logFDR_bin))+
+# metorder.sel<-as.character(selectcast[order(selectcast.c$`GR_T-C_logFC`),'MetaboliteU'])
+# selectcast$MetaboliteU<-factor(selectcast$MetaboliteU,levels=metorder.sel,labels = metorder.sel)
+# ggplot(selectcast.c,aes(x=MetaboliteU,y=`GR_T-C_logFC`,color=GR_logFDR_bin))+
 #   geom_hline(yintercept = 0,color='red',alpha=0.5)+
 #   geom_errorbar(aes(ymin=`GR_T-C_NE`,ymax=`GR_T-C_PE`))+
 #   geom_point()+
@@ -705,11 +511,11 @@ dev.copy2pdf(device=cairo_pdf,
 # #Some will be missing
 
 
-metorder.sel<-as.character(selectcast[order(selectcast$`T-C_logFC`),'Metabolite_Uniq'])
-selectcast$Metabolite_Uniq<-factor(selectcast$Metabolite_Uniq,levels=metorder.sel,labels = metorder.sel)
+metorder.sel<-as.character(selectcast[order(selectcast$`T-C_logFC`),'MetaboliteU'])
+selectcast$MetaboliteU<-factor(selectcast$MetaboliteU,levels=metorder.sel,labels = metorder.sel)
 
 
-ggplot(selectcast,aes(x=Metabolite_Uniq,y=`T-C_logFC`,color=logFDR_bin))+
+ggplot(selectcast,aes(x=MetaboliteU,y=`T-C_logFC`,color=logFDR_bin))+
   geom_hline(yintercept = 0,color='red',alpha=0.5)+
   geom_errorbar(aes(ymin=`T-C_NE`,ymax=`T-C_PE`))+
   geom_point()+
@@ -779,7 +585,7 @@ dev.copy2pdf(device=cairo_pdf,
 # 
 #   xlab('Growth logFC vs NGM - Control')+
 #   ylab('Growth logFC vs NGM - +50mM Metformin')+
-#   geom_text_repel(aes(label=ifelse(Metabolite_class=='carbohydrate' , as.character(Metabolite_Uniq),'')),
+#   geom_text_repel(aes(label=ifelse(Metabolite_class=='carbohydrate' , as.character(MetaboliteU),'')),
 #                   size=lblsize,nudge_y = 0.3,
 #                   force=1,
 #                   segment.colour=errcolor,
@@ -943,7 +749,7 @@ ggplot(selectcast,aes(x=`T-C_logFC`,
   
   xlab('Growth rescue in E. coli (metabolite effect normalised), logFC')+
   ylab('Phenotype rescue in C. elegans (acs-2 GFP), logFC')+
-  geom_text_repel(aes(label=ifelse(Cel_FDR<0.05 , as.character(Metabolite_Uniq),'')),
+  geom_text_repel(aes(label=ifelse(Cel_FDR<0.05 , as.character(MetaboliteU),'')),
                   size=lblsize,nudge_y = 0.3,force=1,
                   segment.colour=errcolor,
                   segment.alpha =segalpha)+
@@ -966,12 +772,12 @@ dev.copy2pdf(device=cairo_pdf,
 
 #Venn diagram
 
-EC.ant<-as.character(subset(selectcast,`T-C_FDR`<0.05 & `T-C_logFC`>0 )$Metabolite_Uniq)
-EC.syn<-as.character(subset(selectcast,`T-C_FDR`<0.05 & `T-C_logFC`<0 )$Metabolite_Uniq)
-EC.non<-as.character(subset(selectcast,`T-C_FDR`>0.05 )$Metabolite_Uniq)
-EC.nonstrict<-as.character(subset(selectcast,`T-C_FDR`>0.05 & `C_FDR`>0.05 &`T_FDR`>0.05)$Metabolite_Uniq)
-Cel.rescue<-as.character(subset(selectcast,`Cel_FDR`<0.05 & -`Cel_logFC`>0 )$Metabolite_Uniq)
-Cel.aggr<-as.character(subset(selectcast,`Cel_FDR`<0.05 & -`Cel_logFC`<0 )$Metabolite_Uniq)
+EC.ant<-as.character(subset(selectcast,`T-C_FDR`<0.05 & `T-C_logFC`>0 )$MetaboliteU)
+EC.syn<-as.character(subset(selectcast,`T-C_FDR`<0.05 & `T-C_logFC`<0 )$MetaboliteU)
+EC.non<-as.character(subset(selectcast,`T-C_FDR`>0.05 )$MetaboliteU)
+EC.nonstrict<-as.character(subset(selectcast,`T-C_FDR`>0.05 & `C_FDR`>0.05 &`T_FDR`>0.05)$MetaboliteU)
+Cel.rescue<-as.character(subset(selectcast,`Cel_FDR`<0.05 & -`Cel_logFC`>0 )$MetaboliteU)
+Cel.aggr<-as.character(subset(selectcast,`Cel_FDR`<0.05 & -`Cel_logFC`<0 )$MetaboliteU)
 
 rescue<-list('C. elegans aggravate'=Cel.aggr,
              'E. coli synergistic'=EC.syn,
@@ -1042,7 +848,7 @@ intersect(Cel.aggr,EC.nonstrict)
 
 head(results)
 
-results.ec<-subset(results,Measure=='G' & Contrast=='T-C')[,c('Index','Plate','Metabolite','Metabolite_Uniq','logFC','FDR')]
+results.ec<-subset(results,Measure=='G' & Contrast=='T-C')[,c('Index','Plate','Metabolite','MetaboliteU','logFC','FDR')]
 
 results.ec$Organism<-'Ec'
 head(results.ec)
@@ -1050,7 +856,7 @@ dim(results.ec)
 
 head(results.cel.r)
 
-results.celegans<-results.cel.r[,c('Index','Plate','Metabolite','Metabolite_Uniq','logFC','FDR')]
+results.celegans<-results.cel.r[,c('Index','Plate','Metabolite','MetaboliteU','logFC','FDR')]
 results.celegans$logFC<- - results.celegans$logFC
 results.celegans$Organism<-'Ce'
 
@@ -1077,7 +883,7 @@ head(results.enr.f)
 #Classes preparation
 classes.r<-read.xlsx2('../Biolog/Biolog_metabolites_EcoCyc.xlsx',sheetName = 'Classes',header=TRUE,endRow=481)
 
-classes<-merge(info[,c('Index','Plate','Well','Metabolite','Metabolite_Uniq')],classes.r[,c('Index','Class1','Class2')],by='Index')
+classes<-merge(info[,c('Index','Plate','Well','Metabolite','MetaboliteU')],classes.r[,c('Index','Class1','Class2')],by='Index')
 classes<-subset(classes,Plate %in% c('PM1','PM2A','PM3B','PM4A'))
 
 
@@ -1200,7 +1006,7 @@ encast.r<-selectcast
 encast.r$Res_logFC<- -encast.r$Cel_logFC
 encast.r$Res_FDR<-encast.r$Cel_FDR
 
-encast<-encast.r[,c('Plate','Well','Index','Metabolite_Uniq','EcoCycID',
+encast<-encast.r[,c('Plate','Well','Index','MetaboliteU','EcoCycID',
                     'T-C_logFC','T-C_FDR',
                     'Res_logFC','Res_FDR')]
 
@@ -1237,7 +1043,7 @@ write.csv(cdata.c,paste0(odir,'/EcoCyc_all_classes.csv'))
 
 head(cdata.c)
 
-idvariables<-c('Class','NoInstances','subclasses','supclasses','Hierarchy','Instance','Index','EcoCycID','Metabolite_Uniq')
+idvariables<-c('Class','NoInstances','subclasses','supclasses','Hierarchy','Instance','Index','EcoCycID','MetaboliteU')
 selstats<-c('logFC','FDR')
 
 cdata.m<-enrichment.melt(cdata,idvariables,selstats)

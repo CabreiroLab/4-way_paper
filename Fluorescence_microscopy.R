@@ -1,6 +1,6 @@
 library(tidyverse)
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
@@ -11,8 +11,8 @@ odir<-'Summary'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-#load("FluorescenceMicroscopy.RData")
-save.image('FluorescenceMicroscopy.RData')
+load("FluorescenceMicroscopy.RData")
+#save.image('FluorescenceMicroscopy.RData')
 
 
 theme_set(theme_light())
@@ -206,6 +206,8 @@ allgroups
 
 contrasts<-read.contrasts2('!Contrasts.xlsx')
 
+
+
 contrasts$Contrasts.table
 contrasts.desc<-contrasts$Contrasts.table%>%
   select(Description:Supplement)
@@ -217,50 +219,26 @@ contr.matrix
 
 
 
-lmdata<-data %>%
+results.all<-data %>%
   filter(Measure=='Log') %>%
   group_by(Gene) %>%
   do(hypothesise2(.,"Norm~0+ID",contr.matrix)) %>%
-  ungroup
-
-
-results<-contrasts.desc %>%
-  mutate(Description=factor(Description,levels=contrasts.desc$Description)) %>%
-  left_join(lmdata) %>%
-  #Adjustments within contrast
-  adjustments %>%
-  select(Gene,everything())
+  getresults(contrasts.desc)
 
 
 
-results %>%
-  filter(Contrast=='OP50_T') %>%
-  arrange(FDR) %>%
-  View
 
 
-results.m<-results %>%
-  gather(Stat,Value,logFC:logFDR)
 
-results.castfull<-results.m %>%
-  arrange(Contrast,desc(Stat)) %>%
-  unite(CS,Contrast,Stat) %>%
-  select(Gene,CS,Value) %>%
-  spread(CS,Value) %>%
-  mutate_at(vars(-c(Gene),-contains('Stars')),as.numeric)
-
-results.cast<-results.m %>%
-  filter(Stat %in% c('logFC','FDR')) %>%
-  #arrange(Contrast,desc(Stat)) %>%
-  unite(CS,Contrast,Stat) %>%
-  select(Gene,CS,Value) %>%
-  spread(CS,Value) %>%
-  mutate_at(vars(-c(Gene),-contains('Stars')),as.numeric)
+results<-results.all$results
+results.castfull<-results.all$castfull
+results.cast<-results.all$cast
+results.multi<-results.all$multi
 
 head(results.castfull)
 head(results.cast)
 
-View(results.cast)
+View(results)
 
 
 
@@ -386,7 +364,7 @@ RNAresults<-results %>%
 
 
 
-amp<-5
+amp<-4
 
 minv<- -amp
 maxv<- amp
@@ -394,13 +372,13 @@ maxv<- amp
 nstep<-maxv-minv
 nstep<-8
 
-clrbrks<-seq(-amp,amp,by=1)
+clrbrks<-seq(-amp,amp,by=2)
 clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
 
 
 
 RNAresults %>%
-  filter(Gene %in% c('acs-2','F37H8.3', 'dhs-23', 'fat-7', 'cpt-2', 'cpt-5')) %>%
+  filter(Gene %in% c('acs-2','F37H8.3', 'dhs-23', 'fat-7', 'cpt-2', 'cpt-5','atgl-1') & Type=='RNAseq') %>%
   ggplot(aes(x=Description,y=Gene))+
   geom_tile(aes(fill=logFC))+
   geom_text(aes(label=as.character(Stars)))+
@@ -420,8 +398,8 @@ RNAresults %>%
         axis.text.y= element_text(face='bold', colour='black', size=10))
 
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_RNAseq_clean.pdf',sep = ''),
-             width=4,height=5,useDingbats=FALSE)
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_RNAseq.pdf',sep = ''),
+             width=3,height=5,useDingbats=FALSE)
 
 
 

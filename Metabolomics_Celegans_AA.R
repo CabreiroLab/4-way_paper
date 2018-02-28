@@ -10,7 +10,6 @@ library(circlize)
 
 library(ggthemes)
 
-
 devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
@@ -50,8 +49,8 @@ theme_set(theme_Publication())
 
 setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
 
-#save.image('Metabolomics_Celegans_AA.RData')
-#load('Metabolomics_Celegans_AA.RData')
+# save.image('Metabolomics_Celegans_AA.RData')
+# load('Metabolomics_Celegans_AA.RData')
 
 
 odir<-'Summary_Celegans_AA_filtered'
@@ -361,10 +360,13 @@ results.all<-met %>%
 
 
 
-results<-results.all$results
+results<-results.all$results %>%
+  mutate(Description=factor(Description,levels=contrasts.desc$Description))
+
+
 results.cast<-results.all$cast
 results.castfull<-results.all$castfull
-
+results.int<-results.all$multi
 
 write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/All_results_sidebyside.csv',sep=''),row.names = FALSE)
@@ -376,17 +378,17 @@ results %>%
   filter(Strain=='BW52113')
 
 
-cnt.vals<-results %>%
-  select(-one_of('Metabolite','Metabolite_short') ) %>%
-  colnames(.)
-
-results.int<-results %>%
-  rename_(.dots = setNames(cnt.vals, paste0('x_',cnt.vals))) %>%
-  full_join(results %>%
-              rename_(.dots = setNames(cnt.vals, paste0('y_',cnt.vals)))) %>%
-  full_join(results %>%
-              rename_(.dots = setNames(cnt.vals, paste0('z_',cnt.vals)))) %>%
-  select(Metabolite:Metabolite_short,everything())
+# cnt.vals<-results %>%
+#   select(-one_of('Metabolite','Metabolite_short') ) %>%
+#   colnames(.)
+# 
+# results.int<-results %>%
+#   rename_(.dots = setNames(cnt.vals, paste0('x_',cnt.vals))) %>%
+#   full_join(results %>%
+#               rename_(.dots = setNames(cnt.vals, paste0('y_',cnt.vals)))) %>%
+#   full_join(results %>%
+#               rename_(.dots = setNames(cnt.vals, paste0('z_',cnt.vals)))) %>%
+#   select(Metabolite:Metabolite_short,everything())
 
 
 
@@ -480,7 +482,8 @@ results.joint<-read_csv('Summary_Celegans_FA/All_results.csv') %>%
          Metabolite=`Clean name`) %>%
   select(-`Common name`) %>%
   mutate(Type='Fatty acids') %>%
-  rbind(results %>% mutate(Type='Amino acids') %>% select(-Drug))
+  rbind(results %>% mutate(Type='Amino acids') %>% select(-Drug)) %>%
+  mutate(Description=factor(Description,levels=contrasts.desc$Description))
 
 
 
@@ -496,7 +499,7 @@ fig2conts<-c('C_T-C_C','MR_T-MR_C','nhr49_T-nhr49_C','MR_C-C_C','nhr49_C-C_C')
 
 fig6conts<-c('C_T-C_C','MR_T-MR_C','crp_T-crp_C','MR_C-C_C','crp_C-C_C')
 
-contsel<-fig2conts
+contsel<-fig6conts
 
 heatsum<-results.joint %>%
   filter(Contrast %in% contsel) %>%
@@ -533,6 +536,7 @@ clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nste
 results.joint %>%
   filter(Contrast %in% contsel) %>%
   #mutate(`Clean name`=factor(Metabolite,levels=ordmet)) %>%
+  #mutate(Description=factor(Metabolite,levels=ordmet)) %>%
   ggplot(aes(x=Description,y=Metabolite))+
   geom_tile(aes(fill=logFC))+
   #geom_point(aes(size=FDRc,colour=logFC),alpha=0.9)+
@@ -556,7 +560,7 @@ results.joint %>%
 
 
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig2_combined.pdf',sep = ''),
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig6_combined.pdf',sep = ''),
              width=5,height=10,useDingbats=FALSE)
 
 

@@ -298,10 +298,10 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 #Absolute concentrations over all samples
-met.abs<-ddply(met.mes,.(Metabolite,Common.name,Clean.name,Measure),summarise,Mean=mean(Value),SD=sd(Value))
-met.am<-melt(met.abs,measure.vars = c('Mean','SD'),variable.name = 'Stat',value.name = 'Value')
-#Average concentration over all samples
-met.c<-dcast(met.am,Metabolite+Common.name+Clean.name~Measure+Stat,value.var = 'Value',drop = TRUE)
+# met.abs<-ddply(met.mes,.(Metabolite,Common.name,Clean.name,Measure),summarise,Mean=mean(Value),SD=sd(Value))
+# met.am<-melt(met.abs,measure.vars = c('Mean','SD'),variable.name = 'Stat',value.name = 'Value')
+# #Average concentration over all samples
+# met.c<-dcast(met.am,Metabolite+Common.name+Clean.name~Measure+Stat,value.var = 'Value',drop = TRUE)
 
 
 head(met.c)
@@ -337,6 +337,8 @@ results<-results.all$results
 results.cast<-results.all$cast
 results.castfill<-results.all$castfull
 
+results.int<-results.all$multi
+
 
 write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/All_results_sidebyside.csv',sep=''),row.names = FALSE)
@@ -349,13 +351,13 @@ cnt.vals<-results %>%
   select(-one_of('Metabolite','Clean name','Common name') ) %>%
   colnames(.)
 
-results.int<-results %>%
-  rename_(.dots = setNames(cnt.vals, paste0('x_',cnt.vals))) %>%
-  full_join(results %>%
-              rename_(.dots = setNames(cnt.vals, paste0('y_',cnt.vals)))) %>%
-  full_join(results %>%
-              rename_(.dots = setNames(cnt.vals, paste0('z_',cnt.vals)))) %>%
-  select(Metabolite:`Clean name`,everything())
+# results.int<-results %>%
+#   rename_(.dots = setNames(cnt.vals, paste0('x_',cnt.vals))) %>%
+#   full_join(results %>%
+#               rename_(.dots = setNames(cnt.vals, paste0('y_',cnt.vals)))) %>%
+#   full_join(results %>%
+#               rename_(.dots = setNames(cnt.vals, paste0('z_',cnt.vals)))) %>%
+#   select(Metabolite:`Clean name`,everything())
 
 
 
@@ -493,7 +495,7 @@ results %>%
   ggplot(aes(x=Description,y=`Clean name`))+
   geom_tile(aes(fill=logFC))+
   #geom_point(aes(size=FDRc,colour=logFC),alpha=0.9)+
-  theme_minimal()+
+  #theme_minimal()+
   geom_text(aes(label=as.character(FDRStars)))+
   #scale_size_discrete(range = c(2,4))+#,breaks=brks
   scale_fill_gradientn(colours = clrscale,
