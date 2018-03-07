@@ -5,7 +5,7 @@ theme_set(theme_light())
 
 setwd("~/Dropbox/Projects/Metformin_TF_acs-2")
 
-odir<-'Summary'
+odir<-'Summary_TF_acs-2'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 #load('Metformin_TF_acs-2.RData')

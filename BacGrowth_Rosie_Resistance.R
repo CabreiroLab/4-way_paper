@@ -1,56 +1,12 @@
-library(xlsx)
-library(plyr)
-library(reshape2)
-library(tidyr)
-library(ggplot2)
-
-library(gplots)
-library(gtools)
-library(rgl)
-library(cluster)
-library(heatmap3)
-
-library(multcomp)
-library(contrast)
-library(RColorBrewer)
-
-library(grid)
-library(gridExtra)
+library(tidyverse)
+library(broom)
 library(ggrepel)
 
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-theme_set(theme_light())
-
-getinfo<-function(cof) {
-  df<-data.frame(cof)
-  df$Comparisons<-rownames(df)
-  return(df)
-}
-
-
-mycolsplit<-function(column,cols,sep=':'){
-  elems<-unlist(strsplit(column,paste("([\\",sep,"])",sep=''), perl=TRUE))
-  return(as.data.frame(matrix(elems,ncol=cols,byrow=TRUE)))
-}
-
-
-MinMeanSDMMax <- function(x) {
-  v <- c(min(x), mean(x) - sd(x), mean(x), mean(x) + sd(x), max(x))
-  names(v) <- c("ymin", "lower", "middle", "upper", "ymax")
-  v
-}
-
-mymerge<-function(all.results,results) {
-  if (dim(all.results)[[1]]==0) {
-    all.results<-results
-  } else {
-    all.results<-merge(all.results,results,all.x=TRUE,all.y=TRUE)
-  }
-  return(all.results)
-}
+theme_set(theme_Publication(12))
 
 
 cwd<-"~/Dropbox/Projects/Metformin_project/Bacterial Growth Assays/"
@@ -61,350 +17,257 @@ odir<-'Summary_resistance'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-data<-read.table('Clean/2017-Rosie_Resistant/Summary.csv',sep=',',quote = '"',header = TRUE)
+#save.image('BGA_resistance.RData')
+#load('BGA_resistance.RData')
+
+
+strainlist<-c('OP50-C','OP50-MR','OP50-R1','OP50-R2')
+metf<-c("0","25","50","75","100","150")
+
+
+NormNames<-data.frame(Normalisation=c("Value","Norm_C","Norm_M","Norm_CM"), NormName=c("Absolute","By OP50-C","By Metformin=0","By OP50-C and Metformin=0") )
+MeasNames<-data.frame(Measure=c("AUC","logAUC","Dph"),
+                      MeasName=c("Growth AUC, OD*h","Growth log AUC, log2(OD*h)","Growth rate, doubling/h"),
+                      MeasShort=c("Growth AUC","Growth log AUC","Growth rate") )
+
+
+data<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Resistance/Summary.csv') %>%
+  filter(!is.na(Strain)) %>%
+  select(Plate:TReplicate,AUC=Int_600nm_f,logAUC=Int_600nm_log,Dph=a_log,-Data) %>%
+  mutate_at(vars(Plate:TReplicate),as.factor) %>%
+  mutate(Metformin_mM=factor(Metformin_mM,levels=metf),
+         Strain=factor(Strain,levels=strainlist,labels=strainlist)) %>%
+  gather(Measure,Value,AUC:Dph) %>%
+  group_by(Metformin_mM,Measure) %>%
+  mutate(Ref_C=mean(Value[Strain=='OP50-C']) ) %>%
+  group_by(Strain,Measure) %>%
+  mutate(Ref_M=mean(Value[Metformin_mM=='0'])) %>%
+  group_by(Measure) %>%
+  mutate(Ref_CM=mean(Value[Metformin_mM=='0' & Strain=='OP50-C']),
+         Norm_C=Value-Ref_C,
+         Norm_M=Value-Ref_M,
+         Norm_CM=Value-Ref_CM) %>%
+  ungroup %>%
+  gather(Normalisation,Value,Value,Norm_C,Norm_M,Norm_CM) %>%
+  left_join(NormNames) %>%
+  left_join(MeasNames)
+
+
+data %>%
+  select(-c(NormName,MeasName,MeasShort)) %>%
+  write_csv(paste0(odir,"/Raw_data_Summary.csv"))
+
+
+data_ts<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Resistance/Data.csv') %>%
+  filter(Data=='600nm_f' & !is.na(Strain)) %>%
+  gather(Time_s,OD,contains('.0')) %>%
+  mutate_at(vars(Plate:TReplicate),as.factor) %>%
+  select(-Data) %>%
+  mutate(Metformin_mM=factor(Metformin_mM,levels=metf),
+         Strain=factor(Strain,levels=strainlist),
+         Time_s=as.numeric(Time_s),
+         Time_h=Time_s/3600)
+
+
+
+data_ts %>%
+  group_by(Strain,Replicate,TReplicate,Metformin_mM) %>%
+  summarise(Count=n()) %>%
+  View
+
+
+
+Metcols <- colorRampPalette(c("red", "blue4"))(6)
+names(Metcols) <- levels(data_ts$Metformin_mM)
+Metlab<-'Metformin, mM'
+
+ggplot(data_ts,aes(x=Time_h,y=OD,color=Metformin_mM))+
+  geom_line(aes(group=interaction(Plate,Replicate,TReplicate,Metformin_mM)))+
+  xlab('Time, h')+
+  scale_colour_manual(name = Metlab,values =Metcols)+
+  scale_x_continuous(breaks=seq(0,24,by=2))+
+  facet_wrap(~Strain)
+
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Growth_overview.pdf",sep=''),
+             width=9,height=6)
 
 
 
 
-strainlist<-c('OP50Sens','OP50MR','OP50R1','OP50R2')
+data.sum<-data_ts %>%
+  group_by(Strain,Metformin_mM,Time_h) %>%
+  summarise(OD_Mean=mean(OD),
+            OD_SD=sd(OD))
 
-data<-subset(data,Strains %in% strainlist)
+ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
+  geom_line()+
+  geom_ribbon(aes(ymin=OD_Mean-OD_SD,
+                  ymax=OD_Mean+OD_SD),alpha=0.5,color=NA)+
+  xlab('Time, h')+
+  ylab('OD')+
+  scale_colour_manual(name = Metlab,values = Metcols)+
+  scale_fill_manual(name = Metlab,values = Metcols)+
+  scale_x_continuous(breaks=seq(0,18,by=2))+
+  facet_wrap(~Strain)
 
-
-data$Strains<-factor(data$Strains, levels=strainlist,labels=strainlist)
-data$Metformin<-as.factor(data$Metformin_conc_mM)
-
-contr<-subset(data,Strains=='OP50Sens')
-
-contr<-rename(contr,c('Int_600nm_f'='Int_Sens','Int_600nm_log'='Int_Sens_log','a_log'='a_Sens'))
-contr0<-subset(contr,Metformin==0)
-contr0<-rename(contr0,c('Int_Sens'='Int_Sens0','Int_Sens_log'='Int_Sens0_log','a_Sens'='a_Sens0'))
-
-datac<-merge(data,contr[,c('Plate','Replicate','Metformin','Int_Sens','Int_Sens_log','a_Sens')],by=c('Plate','Replicate','Metformin'),all.y=TRUE)
-
-datac<-merge(datac,contr0[,c('Plate','Replicate','Int_Sens0','Int_Sens0_log','a_Sens0')],by=c('Plate','Replicate'),all.y=TRUE)
-
-
-
-datac$Int_600nm_rel<-datac$Int_600nm_f/datac$Int_Sens
-datac$Int_600nm_rel_log<-datac$Int_600nm_log-datac$Int_Sens_log
-datac$Int_600nm_rel0_log<-datac$Int_600nm_log-datac$Int_Sens0_log
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Growth_Summary.pdf",sep=''),
+             useDingbats=FALSE,
+             width=9,height=6)
 
 
-datac$a_rel<-datac$a_log-datac$a_Sens
-datac$a_rel0<-datac$a_log-datac$a_Sens0
+PlotBox<-function(data,yvar,ytitle,title) {
+  data %>%
+    ggplot()+
+    aes(x=Metformin_mM,y=Value,color=Metformin_mM)+
+    geom_hline(aes(yintercept = 0),color='red4',alpha=0.5,linetype='longdash')+
+    stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "dodge",alpha=0.2)+
+    geom_point()+
+    ylab(ytitle)+
+    ggtitle(paste0("Normalisation: ",title))+
+    xlab("Metformin, mM")+
+    scale_colour_manual(name = Metlab,values = Metcols)+
+    scale_y_continuous(breaks = seq(-10,10,by=1))+
+    coord_cartesian(ylim = c(-3,3)) +
+    facet_wrap(~Strain)
+}
+
+
+Boxplots<-data %>%
+  group_by(Measure,Normalisation) %>%
+  do(plot=PlotBox(.,unique(as.character(.$Measure)),unique(as.character(.$MeasName)), unique(as.character(.$NormName))))
+
+
+map2(paste0(odir,"/Growth_comparisons_",as.character(Boxplots$Measure),"_",as.character(Boxplots$Normalisation),".pdf"),
+     Boxplots$plot,
+     width=9,height=6, useDingbats=FALSE, ggsave)
 
 
 
 
-datacm<-melt(datac,id.vars = c('Strains','Metformin','Metformin_conc_mM'),measure.vars = c('Int_600nm_f','Int_600nm_log',
-                                                                                           'Int_600nm_rel','Int_600nm_rel_log','Int_600nm_rel0_log',
-                                                                                           'a_log','a_Sens','a_Sens0'),
-             variable.name = 'Estimate',value.name = 'Value')
+
+stat<-data %>%
+  group_by(Metformin_mM,Measure,MeasName,MeasShort,Normalisation,NormName) %>%
+  do(tidy(lm(Value~0+Strain,data=.))) %>%
+  rename(SE=std.error,
+         logFC=estimate) %>%
+  mutate(Strain=str_replace(term,'Strain',''),
+         Strain=factor(Strain,levels=strainlist,labels=strainlist),
+         PE=logFC+SE,
+         NE=logFC-SE,
+         Prc=2^logFC*100,
+         PrcNE=2^NE*100,
+         PrcPE=2^PE*100,
+         pStars=pStars(p.value)) 
+
+# Metformin_mM=str_extract(term,'[[:digit:]]{1,3}'),
+# Metformin_mM=factor(Metformin_mM,levels=metf ),
 
 
-summaryt<-ddply(datacm,.(Strains,Metformin,Metformin_conc_mM,Estimate),
-             summarise,Mean=mean(Value,na.rm=TRUE),SD=sd(Value,na.rm=TRUE))
+stat %>%
+  write_csv(paste0(odir,"/Stats_Summary.csv"))
 
 
-summarym<-melt(summaryt,id.vars = c('Strains','Metformin','Metformin_conc_mM','Estimate'),measure.vars = c('Mean','SD'),
-             variable.name = 'Stat',value.name = 'Value')
-
-summary<-dcast(subset(summarym,!Stat %in% c('Int_600nm_rel0_log')),
-               Strains+Metformin+Metformin_conc_mM~Estimate+Stat,mean,value.var = c('Value'),
-               fill = as.numeric(NA),drop=TRUE)
+View(stat)
 
 
-write.csv(summary,
-          paste(odir,"/Summary.csv",sep=''))
+stat %>%
+  filter(Measure=='AUC' & Normalisation=="Norm_CM" & Metformin_mM=='150')
 
 
-# fit2<-lm(Int_600nm_rel_log~0+Strains*Metformin,datac)
-# summary(fit2)
 
 
-lmshape<-dcast(datac,Strains+Replicate+Plate~Metformin,value.var = 'Int_600nm_rel_log',drop = TRUE)
+stat %>%
+  filter(Measure=='logAUC' & Normalisation=="Norm_CM") %>%
+  ggplot(aes(x=Metformin_mM,y=Prc,color=Metformin_mM))+
+  geom_hline(aes(yintercept = 100),color='red4',alpha=0.5,linetype='longdash')+
+  scale_y_continuous(breaks=seq(0,400,by=25))+
+  coord_cartesian(ylim=c(0,150))+
+  geom_line(aes(group=Strain))+
+  geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25)+
+  geom_point()+
+  ggtitle("Comparison vs OP50-C in control",subtitle = "Significance shown for difference vs OP50-C")+
+  scale_colour_manual(name = Metlab,values = Metcols)+
+  ylab("Growth logAUC, %")+
+  xlab("Metformin, mM")+
+  geom_text(data=stat %>%
+              filter(Measure=='AUC' & Normalisation=="Norm_C"),
+            aes(label=pStars),color='black',y = 130)+
+  facet_wrap(~Strain)
 
 
-#Comparison done within each metformin range, thus restricting variation
-#Making general linear model leads to skewed SE estimation
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Growth_Comparison_vs_OP50-C_Control.pdf",sep=''),
+             useDingbats=FALSE,
+             width=9,height=6)
 
-metfc<-c('0','25','50','75','100','150')
 
-relresults<-data.frame()
-for (mc in metfc) {
-  formula<-as.formula(paste("`",mc,"`","~0+Strains",sep=''))
-  fit<-lm(formula,lmshape)
-  results<-summary(fit)
-  res<-getinfo(results$coefficients)
-  res$Metformin<-mc
-  relresults<-mymerge(relresults,res)
+
+Straincols <- c("red","blue4", colorRampPalette(c("orange", "black"))(6))
+Straincols <- c("red4","blue4", rainbow(6))
+Straincols <- c("red4","blue4", terrain.colors(6))
+
+
+Straincols <- c("red","blue", "orange","purple4")
+names(Straincols) <- strainlist
+Strainlab<-"Strain"
+
+
+
+PlotComp<-function(data,stat,meas,measname) {
+  stars<-stat %>%
+    filter(Measure==meas,Normalisation=="Norm_C")
+  
+  data %>%
+    ggplot(aes(x=Metformin_mM,y=Prc,color=Strain,fill=Strain))+
+    scale_y_continuous(breaks=seq(0,200,by=25))+
+    coord_cartesian(ylim=c(0,140))+
+    geom_hline(aes(yintercept = 100),color='gray75',linetype='longdash')+
+    geom_ribbon(aes(group=interaction(Strain),
+                    ymin=PrcNE,
+                    ymax=PrcPE),
+                alpha=0.75,
+                color=NA,
+                show.legend=FALSE)+
+    geom_line(aes(group=interaction(Strain)))+
+    #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
+    geom_point()+
+    ggtitle("Significance shown for differences vs OP50-C")+
+    scale_colour_manual(name = Strainlab,values = Straincols)+
+    scale_fill_manual(name = Strainlab,values = Straincols)+
+    ylab(paste0(measname," vs OP50-C Control, %") )+
+    xlab("Metformin, mM")+
+    geom_text(data=stars,
+              aes(label=pStars,y=20-as.numeric(Strain)*4 ),nudge_y = 130, show.legend = FALSE)
 }
 
 
 
-#fit<-lm(Int_600nm_rel_log~0+Strains:Metformin,datac)
-#results<-summary(fit)
-#results
+stat %>%
+  filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>% 
+  PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
 
 
-#relresults<-getinfo(results$coefficients)
-relresults$Comparisons<-gsub('Strains','',relresults$Comparisons)
-relresults$Strains<-relresults$Comparisons
-#relresults$Comparisons<-gsub('Metformin','',relresults$Comparisons)
+Compplots<-stat %>%
+  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
+  group_by(Measure) %>%
+  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) )
 
+Compwrap<-stat %>%
+  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
+  group_by(Measure) %>%
+  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain))
 
-#relresults[,c('Strains','Metformin')]<-mycolsplit(relresults$Comparisons,2,':')
-rownames(relresults)<-NULL
-relresults$Comparisons<-NULL
-relresults$Strains<-factor(relresults$Strains, levels=strainlist,labels=strainlist)
-relresults$Metformin<-factor(relresults$Metformin,levels=c(0,25,50,75,100,150),labels=c(0,25,50,75,100,150))
-relresults$Metformin_conc_mM<-as.numeric(as.character(relresults$Metformin))
-relresults<-rename(relresults,c('Estimate'='logFC','Std..Error'='SE','Pr...t..'='p.value'))
-relresults$FDR<-p.adjust(relresults$p.value,method = 'fdr')
 
-relresults$Prc<-(2^relresults$logFC)*100-100
-relresults$Prc_min<-(2^(relresults$logFC-relresults$SE))*100-100
-relresults$Prc_max<-(2^(relresults$logFC+relresults$SE))*100-100
-relresults$Stars<-as.character(stars.pval(relresults$FDR))
-relresults$Stars<-ifelse(relresults$Stars==".","",relresults$Stars)
-head(relresults)
+map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),".pdf"),
+     Compplots$plot,
+     width=5,height=3, useDingbats=FALSE, ggsave)
 
-write.csv(relresults[,c('Strains','Metformin_conc_mM','logFC','SE','Prc','Prc_min','Prc_max','t.value','p.value','FDR')],
-          paste(odir,"/Stats.csv",sep=''))
 
-
-
-
-
-
-ggplot(datac,aes(x=Metformin,y=Int_600nm_log,color=Strains))+
-  #geom_boxplot()+
-  ylab('log2 Growth integral, log2 OD*h')+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Absolute_growth_log.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-ggplot(datac,aes(x=Metformin,y=Int_600nm_f,color=Strains))+
-  #geom_boxplot()+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Absolute_growth.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-ggplot(datac,aes(x=Metformin,y=a_log,color=Strains))+
-  #geom_boxplot()+
-  ylab('Growth rate, doublings/h')+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Absolute_growth_rate.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-
-
-ggplot(datac,aes(x=Metformin,y=(2^Int_600nm_rel0_log)*100-100,color=Strains))+
-  #geom_boxplot()+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  ylab('Relative growth to OP50Sens, %')+
-  ylim(-100,50)+
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-ggplot(datac,aes(x=Metformin,y=a_rel0,color=Strains))+
-  #geom_boxplot()+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  ylab('Growth rate (relative to OP50Sens), doublings/h')+
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_rate.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-
-
-
-ggplot(datac,aes(x=Metformin,y=(2^Int_600nm_rel0_log)*100-100,color=Strains))+
-  geom_hline(yintercept=0,colour='red',alpha=0.5)+
-  #geom_boxplot()+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  ylab('Relative growth change in comparison to OP50Sens, %')+
-  ylim(-100,50)+
-  xlab('Metformin, mM')+
-  facet_grid(.~Strains)
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_spread.pdf",sep=''),
-             width=12,height=5, useDingbats=FALSE)
-
-
-
-
-ggplot(datac,aes(x=Metformin,y=a_rel0,color=Strains))+
-  geom_hline(yintercept=0,colour='red',alpha=0.5)+
-  #geom_boxplot()+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  ylab('Growth rate (relative to OP50Sens), doublings/h')+
-  xlab('Metformin, mM')+
-  facet_grid(.~Strains)
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_rate_spread.pdf",sep=''),
-             width=12,height=5, useDingbats=FALSE)
-
-
-ggplot(datac,aes(x=Metformin,y=(2^Int_600nm_rel_log)*100-100,color=Strains))+
-  #geom_boxplot()+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  ylab('Relative growth to OP50Sens (by metformin), %')+
-  ylim(-25,100)+
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_by_metformin.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-
-
-ggplot(datac,aes(x=Metformin,y=(2^Int_600nm_rel_log)*100-100,color=Strains))+
-  #geom_boxplot()+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  ylab('Relative growth change in comparison to OP50Sens (by metformin), %')+
-  ylim(-100,200)+
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_by_metformin.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-
-ggplot(datac,aes(x=Metformin,y=a_rel,color=Strains))+
-  #geom_boxplot()+
-  #ylim(-1.5,0.5)+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  ylab('Growth rate (relative to OP50Sens), doublings/h')+
-  xlab('Metformin, mM')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_rate_by_metformin.pdf",sep=''),
-             width=9,height=6, useDingbats=FALSE)
-
-
-
-ggplot(datac,aes(x=Metformin,y=(2^Int_600nm_rel_log)*100-100,color=Strains))+
-  geom_hline(yintercept=0,colour='red',alpha=0.5)+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  #geom_point(data=relresults,aes(x=Metformin,y=(2^logFC)*100-100))+
-  #geom_text(data=relresults,aes(label=stars.pval(p.value),x=Metformin,y=(2^logFC)*100-100 ),position='dodge',size=5,color='black')+
-  #geom_boxplot()+
-  ylab('Relative growth change in comparison to OP50Sens (by metformin), %')+
-  ylim(-50,100)+
-  xlab('Metformin, mM')+
-  facet_grid(.~Strains)
-
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_by_metformin_spread.pdf",sep=''),
-             width=12,height=5, useDingbats=FALSE)
-
-
-ggplot(datac,aes(x=Metformin,y=a_rel,color=Strains))+
-  geom_hline(yintercept=0,colour='red',alpha=0.5)+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "dodge") +
-  #geom_point(data=relresults,aes(x=Metformin,y=(2^logFC)*100-100))+
-  #geom_text(data=relresults,aes(label=stars.pval(p.value),x=Metformin,y=(2^logFC)*100-100 ),position='dodge',size=5,color='black')+
-  #geom_boxplot()+
-  ylab('Growth rate (relative to OP50Sens), doubling/h')+
-  #ylim(-50,100)+
-  xlab('Metformin, mM')+
-  facet_grid(.~Strains)
-
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_rate_by_metformin_spread.pdf",sep=''),
-             width=12,height=5, useDingbats=FALSE)
-
-
-
-
-
-shift<-15
-ggplot(relresults,aes(x=Metformin,y=Prc,fill=Strains))+
-  geom_errorbar(aes(ymin=Prc_min,ymax=Prc_max),position="dodge", width=.4)+
-  geom_bar(stat="identity", position="dodge", width=0.5)+
-  geom_hline(yintercept=0,colour='red',alpha=0.5)+
-  geom_text(aes(label=as.character(Stars),y=ifelse(Prc>=0,Prc+shift,Prc-shift)),
-            size=5,color='black',angle=90,nudge_x = 0.1,vjust=0.5,hjust=0.5)+
-  ylab('Relative growth change in comparison to OP50Sens (by metformin), %')+
-  scale_y_continuous(breaks = seq(-1000,1000,by=50))+
-  coord_cartesian(ylim=c(-25,100))+
-  xlab('Metformin, mM')+
-  facet_grid(.~Strains)
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Relative_growth_by_metformin_spread_statsSE.pdf",sep=''),
-             width=8,height=5, useDingbats=FALSE)
-
-
-
-
-
-
-
-datats<-read.table('Clean/2017-Rosie_Resistant/Data.csv',sep=',',quote = '"',header = TRUE)
-datats<-subset(datats,Strains %in% strainlist)
-
-datatm<-melt(datats,id.vars = c('Plate','Well','Data','Media','Media_conc','Metformin_conc_mM','Replicate','Strains'),value.name = 'OD',variable.name = 'Time_s')
-datatm$Time_s<-as.numeric(gsub('X','',datatm$Time_s))
-datatm$Time_h<-datatm$Time_s/3600
-datatm$Strains<-factor(datatm$Strains, levels=strainlist,labels=strainlist)
-datatm$Metformin<-as.factor(datatm$Metformin_conc_mM)
-
-tssum<-ddply(datatm,.(Strains,Metformin,Data,Time_h),summarise,Mean=mean(OD),SD=sd(OD))
-
-
-ggplot(subset(tssum,Data=="600nm_f"),aes(x=Time_h,fill=Metformin))+
-  geom_ribbon(aes(ymin=Mean-SD,ymax=Mean+SD))+
-  geom_line(aes(y=Mean),colour="black")+
-  scale_x_continuous(breaks=seq(0,18,by=2))+
-  ylab("OD@600nm")+
-  labs(fill="Metformin, mM")+
-  xlab("Time, h")+
-  facet_grid(.~Strains)
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Growth_curves_Ribbons.pdf",sep=''),
-             width=14,height=5, useDingbats=FALSE)
-
-
-ggplot(subset(tssum,Data=="600nm_log"),aes(x=Time_h,fill=Metformin))+
-  geom_ribbon(aes(ymin=Mean-SD,ymax=Mean+SD))+
-  geom_line(aes(y=Mean),colour="black")+
-  scale_x_continuous(breaks=seq(0,18,by=2))+
-  labs(fill="Metformin, mM")+
-  ylab("log_OD@600nm")+
-  xlab("Time, h")+
-  facet_grid(.~Strains)
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Growth_log_curves_Ribbons.pdf",sep=''),
-             width=14,height=5, useDingbats=FALSE)
-
+map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),".pdf"),
+     Compwrap$plot,
+     width=9,height=6, useDingbats=FALSE, ggsave)
 
 
