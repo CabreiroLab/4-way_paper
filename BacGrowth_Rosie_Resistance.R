@@ -109,13 +109,13 @@ ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   ylab('OD')+
   scale_colour_manual(name = Metlab,values = Metcols)+
   scale_fill_manual(name = Metlab,values = Metcols)+
-  scale_x_continuous(breaks=seq(0,18,by=2))+
+  scale_x_continuous(breaks=seq(0,18,by=6))+
   facet_wrap(~Strain)
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Growth_Summary.pdf",sep=''),
              useDingbats=FALSE,
-             width=9,height=6)
+             width=5,height=4)
 
 
 PlotBox<-function(data,yvar,ytitle,title) {
@@ -205,9 +205,9 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-Straincols <- c("red","blue4", colorRampPalette(c("orange", "black"))(6))
-Straincols <- c("red4","blue4", rainbow(6))
-Straincols <- c("red4","blue4", terrain.colors(6))
+# Straincols <- c("red","blue4", colorRampPalette(c("orange", "black"))(6))
+# Straincols <- c("red4","blue4", rainbow(6))
+# Straincols <- c("red4","blue4", terrain.colors(6))
 
 
 Straincols <- c("red","blue", "orange","purple4")
@@ -263,7 +263,7 @@ Compwrap<-stat %>%
 
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),".pdf"),
      Compplots$plot,
-     width=5,height=3, useDingbats=FALSE, ggsave)
+     width=5,height=4, useDingbats=FALSE, ggsave)
 
 
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),".pdf"),

@@ -111,13 +111,13 @@ ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   ylab('OD')+
   scale_colour_manual(name = Metlab,values = Metcols)+
   scale_fill_manual(name = Metlab,values = Metcols)+
-  scale_x_continuous(breaks=seq(0,18,by=2))+
-  facet_wrap(~Strain)
+  scale_x_continuous(breaks=seq(0,18,by=6))+
+  facet_wrap(~Strain,ncol=2)
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Growth_Summary.pdf",sep=''),
              useDingbats=FALSE,
-             width=9,height=6)
+             width=5,height=6)
 
 
 PlotBox<-function(data,yvar,ytitle,title) {
@@ -212,27 +212,15 @@ library(viridis)
 
 
 Straincols <- c("red","blue4", colorRampPalette(c("orange", "black"))(6))
-Straincols <- c("red","blue4", viridis(6,option="inferno"))
-
-
 Straincols <- c("red4","blue4", rainbow(6))
-
-
-
 Straincols <- c("red4","blue4", terrain.colors(6))
 
 
 
+
+Straincols <- c("red","blue", viridis::viridis(6,option="inferno"))
 names(Straincols) <- strainlist
 Strainlab<-"Strain"
-
-
-stat %>%
-  filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>% 
-  PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
-
-
-
 
 PlotComp<-function(data,stat,meas,measname) {
   stars<-stat %>%
@@ -252,7 +240,7 @@ PlotComp<-function(data,stat,meas,measname) {
     geom_line(aes(group=interaction(Strain)))+
     #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
     geom_point()+
-    ggtitle("Comparison vs OP50-C in control",subtitle = "Significance shown for differences vs OP50-C")+
+    ggtitle("Significance shown for differences vs OP50-C")+
     scale_colour_manual(name = Strainlab,values = Straincols)+
     scale_fill_manual(name = Strainlab,values = Straincols)+
     # scale_fill_viridis(discrete=TRUE)+
@@ -265,6 +253,10 @@ PlotComp<-function(data,stat,meas,measname) {
               aes(label=pStars,y=40-as.numeric(Strain)*4 ),nudge_y = 120, show.legend = FALSE)
 }
 
+
+stat %>%
+  filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>% 
+  PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
 
 
 Compplots<-stat %>%
