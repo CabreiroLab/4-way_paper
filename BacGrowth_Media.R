@@ -26,11 +26,9 @@ medias<-c('Bacto peptone','Soy peptone','LB','MRS')
 metf<-c("0","25","50","75","100","150")
 
 
-
 MeasNames<-data.frame(Measure=c("AUC","logAUC","Dph"),
                       MeasName=c("Growth AUC, OD*h","Growth log AUC, log2(OD*h)","Growth rate, doubling/h"),
                       MeasShort=c("Growth AUC","Growth log AUC","Growth rate") )
-
 
 
 data<-read_csv('Media growth assays/Media_data/Summary.csv') %>%

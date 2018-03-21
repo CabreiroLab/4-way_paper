@@ -10,38 +10,11 @@ library(circlize)
 
 library(ggthemes)
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
-theme_Publication <- function(base_size=14) {
-  (theme_foundation(base_size=base_size)
-   + theme(plot.title = element_text(face = "bold",
-                                     size = rel(1.2), hjust = 0.5),
-           text = element_text(),
-           panel.background = element_rect(colour = NA),
-           plot.background = element_rect(colour = NA),
-           #panel.border = element_rect(colour = NA),
-           axis.title = element_text(face = "bold",size = rel(1)),
-           axis.title.y = element_text(angle=90,vjust =2),
-           axis.title.x = element_text(vjust = -0.2),
-           axis.text = element_text(), 
-           axis.line = element_line(colour="black"),
-           axis.ticks = element_line(),
-           panel.grid.major = element_line(colour="#f0f0f0"),
-           panel.grid.minor = element_blank(),
-           legend.key = element_rect(colour = NA),
-           #legend.position = "bottom",
-           #legend.direction = "horizontal",
-           #legend.key.size= unit(0.2, "cm"),
-           #legend.margin = unit(0, "cm"),
-           legend.title = element_text(face="italic"),
-           #plot.margin=unit(c(10,5,5,5),"mm"),
-           strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
-           strip.text = element_text(face="bold")
-   ))
-  
-}
+
 
 
 theme_set(theme_Publication())
@@ -497,9 +470,18 @@ comparisons<-c("Treatment effect on OP50","Treatment effect on OP50-MR","Treatme
 
 fig2conts<-c('C_T-C_C','MR_T-MR_C','nhr49_T-nhr49_C','MR_C-C_C','nhr49_C-C_C')
 
-fig6conts<-c('C_T-C_C','MR_T-MR_C','crp_T-crp_C','MR_C-C_C','crp_C-C_C')
 
-contsel<-fig6conts
+
+fig6conts<-c('C_T-C_C','MR_T-MR_C','crp_T-crp_C')
+fig6desc<-
+
+fig6desc
+
+
+
+contsel<-fig2conts
+descsel<-contrasts.desc[contrasts.desc$Contrast %in% contsel,"Description"] %>% as.character
+
 
 heatsum<-results.joint %>%
   filter(Contrast %in% contsel) %>%
@@ -560,8 +542,63 @@ results.joint %>%
 
 
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig6_combined.pdf',sep = ''),
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig2_combined.pdf',sep = ''),
              width=5,height=10,useDingbats=FALSE)
+
+
+
+
+
+
+amp<-3
+
+minv<- -amp
+maxv<- amp
+
+nstep<-(maxv-minv)*2
+
+clrbrks<-seq(-amp,amp,by=1)
+
+brks<-seq(minv,maxv,by=(maxv-minv)/(nstep))
+bgg <- colorRampPalette(c("blue", "gray90", "red"))(n = nstep)
+
+clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
+
+
+
+results.joint %>%
+  filter(Contrast %in% contsel) %>%
+  group_by(Metabolite) %>%
+  filter(any(FDR<0.05)) %>%
+  ungroup %>%
+  mutate(Description=factor(Description,levels=rev(descsel) )) %>%
+  #mutate(Description=factor(Metabolite,levels=ordmet)) %>%
+  ggplot(aes(x=Metabolite,y=Description))+
+  geom_tile(aes(fill=logFC))+
+  #geom_point(aes(size=FDRc,colour=logFC),alpha=0.9)+
+  geom_text(aes(label=as.character(FDRStars)),angle = 90)+
+  #scale_size_discrete(range = c(2,4))+#,breaks=brks
+  scale_fill_gradientn(colours = clrscale,
+                       breaks=clrbrks,limits=c(-amp,amp))+
+  #scale_fill_gradient2(low = "purple", mid = "gray", high = "red", midpoint = 0, breaks = clrbrks)+
+  xlab("Metabolite")+
+  ylab('Comparison')+
+  theme(axis.ticks=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.grid.major = element_blank(),
+        axis.line = element_line(colour = NA),
+        axis.line.x = element_line(colour = NA),
+        axis.line.y = element_line(colour = NA),
+        strip.text = element_text(colour = 'black', face='bold',size=10),
+        axis.text.x= element_text(face='bold', colour='black', size=10, angle = 90, hjust = 1))+
+  facet_grid(.~Type,space='free_x',scale='free_x')
+
+
+
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig2_combined_horizontal.pdf',sep = ''),
+             width=10,height=4,useDingbats=FALSE)
+
 
 
 

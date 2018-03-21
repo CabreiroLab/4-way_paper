@@ -16,23 +16,25 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 translations<-c('gvcA'='gcvA','op50-c'='OP50-C','op50'='OP50-C')
 
 allfiles<-read_csv('Allfiles.csv') %>%
+  rbind(read_csv('Allfiles_additional.csv')) %>%
   filter( !str_detect(Folder,'grouped') ) %>%
-  mutate(Type=ifelse(str_detect(Folder,'wo metf'),'C','T' ),
+  mutate(Dataset=ifelse(str_detect(Replicate_folder,'additional'),"Additional","Original"),
+         Type=ifelse(str_detect(Folder,'wo metf'),'C','T' ),
          Replicate=as.integer(ifelse(str_detect(Replicate_folder,'Rep1'),1,2)),
          Gene=str_trim(str_replace_all(Folder,'metf|wo metf|later|met repeat','')),
          Gene=ifelse(Gene %in% names(translations),translations[Gene],Gene ),
          FileNo=str_extract(File,'[[:digit:]]{1,4}.tiff') %>% str_replace('.tiff','') %>% str_pad(width=4,pad='0') ) %>%
-  group_by(Replicate,Gene,Type,Folder) %>%
+  group_by(Dataset,Replicate,Gene,Type,Folder) %>%
   arrange(FileNo) %>%
   mutate(FileInd=row_number()) %>%
   ungroup %>%
   #filter(!FileNo=='0001') %>%
-  group_by(Replicate,Gene,Type,Folder) %>%
+  group_by(Dataset,Replicate,Gene,Type,Folder) %>%
   mutate(Count=n()) %>%
   ungroup %>%
   group_by(Gene) %>%
   mutate(Max=as.integer(max(Count))) %>%
-  select(Replicate,Type,Gene,FileNo,FileInd,Replicate_folder:File,Max) %>%
+  select(Dataset,Replicate,Type,Gene,FileNo,FileInd,Replicate_folder:File,Max) %>%
   ungroup
 
 head(allfiles)
@@ -44,16 +46,21 @@ allfiles %>%
   head
 
 
+
 allfiles %>%
-  group_by(Replicate,Gene,Type) %>%
+  filter(Dataset=='Additional') %>%
+  View()
+
+allfiles %>%
+  group_by(Dataset,Replicate,Gene,Type) %>%
   summarise(Count=n()) %>%
   ungroup %>%
   unite(RT,Replicate,Type,remove = FALSE) %>%
-  select(Gene,RT,Count) %>%
+  select(Gene,RT,Count,Dataset) %>%
   spread(RT,Count)
   
 allfiles_sum<-allfiles %>%
-  group_by(Replicate,Gene,Type,Folder) %>%
+  group_by(Dataset,Replicate,Gene,Type,Folder) %>%
   summarise(Count=n()) %>%
   ungroup %>%
   group_by(Gene) %>%
@@ -68,15 +75,27 @@ write_csv(allfiles_sum,'Allfiles_summary.csv')
 
 
 
-genes<-c('OP50-C','arcA','argR','cra','crp','csiR','fur','gcvA','mlc','ntrC')
+genes<-c('OP50-C','arcA','argR','cra','crp','csiR','fur','gcvA','mlc','ntrC',"marA","nac")
 
 remindex<-c('1_crp_T_8')
+
+
+results.o<-read_csv('All_results_onlyprc.csv') %>%
+  mutate(X1=NULL) %>%
+  mutate(FileName=File,
+         File=paste('.',Replicate_folder,Folder,FileName,sep='/')) %>%
+  select(-c(FileName,Replicate_folder,Folder,FileName,Replicate,Gene,Type))
+
+results.a<-read_csv('All_results_onlyprc_additional.csv') %>%
+  mutate(X1=NULL)
+
+results.all<-rbind(results.o,results.a)
+
 
 data<-allfiles %>%
   mutate(FileName=File,
          File=paste('.',Replicate_folder,Folder,FileName,sep='/')) %>%
-  left_join(read_csv('All_results_adaptive.csv') %>%
-              mutate(X1=NULL) ) %>%
+  left_join(results.all) %>%
   mutate_at(c('Replicate','Type','Gene','Worm'),as.factor) %>%
   mutate(Gene=factor(Gene,levels=genes)) %>%
   filter(W_N<100000,
@@ -84,7 +103,7 @@ data<-allfiles %>%
          FileNo!='0001',
          !(Replicate==1 & FileInd==2),
          Folder!='OP50-C metf later') %>%
-  group_by(Replicate) %>%
+  group_by(Dataset,Replicate) %>%
   mutate(W_Int=W_Mean-B_Mean,
          W_LogInt=log2(W_Int),
          TpRep_Mean=mean(W_LogInt[Gene=='OP50-C']),#
@@ -109,7 +128,7 @@ data %>%
 
 
 data %>%
-  #filter(Type=='T') %>%
+  filter(Type=='T') %>%
   ggplot(aes(x=Gene,y=W_NormLog,color=Type))+ #,color=Replicate
   geom_jitter() +
   stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "dodge",alpha=0.2)
@@ -129,7 +148,7 @@ data %>%
   geom_histogram() 
 
 
-fit<-lm(W_NormLog~Type*Gene,data)
-
+fit<-lm(W_NormLog~Gene,data %>% filter(Type=="T"))
 summary(fit)
+
 

@@ -18,7 +18,7 @@ setwd(cwd)
 
 
 #save.image('BGA_Gut.RData')
-load('BGA_Gut.RData')
+#load('BGA_Gut.RData')
 
 
 
@@ -53,12 +53,17 @@ data<-rbind(data1,data2) %>%
          OD=OD_raw-Base) %>%
   ungroup %>%
   mutate_at(c('Day','Strain','Metformin_mM','Replicate'),as.factor) %>%
-  filter(File=='1')
+  filter(File=='1') %>%
+  mutate(Strain=recode(Strain,'OP50'='OP50-C'), #,'OP50-MR'='MR'
+    Sample=paste(gsub('-','',recode(Strain,'OP50'='C','OP50-MR'='MR')),Day,sep='_'),
+    Group=paste(recode(Strain,'OP50-C'='C','OP50-MR'='MR'),recode(Metformin_mM,'0'='C','50'='T'),sep='_'),
+    DDay=paste0('D',Day))
 
 
 unique(data$Replicate)
-
-View(data)
+unique(data$Strain)
+unique(data$Group)
+#View(data)
 
 
 data %>%
@@ -79,10 +84,16 @@ unique(data$Replicate)
 
 
 
+Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+names(Metcols) <- levels(data_ts$Metformin_mM)
+Metlab<-'Metformin, mM'
+
+
 ggplot(data,aes(x=Time_h,y=OD,color=Metformin_mM,linetype=File))+
   geom_line(aes(group=interaction(Replicate,Metformin_mM)))+
   xlab('Time, h')+
   scale_x_continuous(breaks=seq(0,18,by=2))+
+  scale_colour_manual(name = Metlab,values =Metcols)+
   facet_grid(Strain~Day,labeller = labeller(.rows = label_both, .cols = label_both))
 
 
@@ -97,14 +108,20 @@ data.sum<-data %>%
   summarise(OD_Mean=mean(OD),
             OD_SD=sd(OD))
 
+
+
+
+
 ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   geom_line()+
   geom_ribbon(aes(ymin=OD_Mean-OD_SD,
                   ymax=OD_Mean+OD_SD),alpha=0.5,color=NA)+
+  scale_colour_manual(name = Metlab,values =Metcols)+
+  scale_fill_manual(name = Metlab,values =Metcols)+
   xlab('Time, h')+
   ylab('OD')+
   scale_x_continuous(breaks=seq(0,18,by=2))+
-  facet_grid(Strain~Day,labeller=labeller(.rows = label_both))
+  facet_grid(Strain~Day,labeller=label_both)
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Growth_Summary.pdf",sep=''),
@@ -114,26 +131,28 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 data.int<-data %>%
-  group_by(Day,Strain,Metformin_mM,Replicate) %>%
+  group_by(Day,Strain,Metformin_mM,Replicate,Sample,Group,DDay) %>%
   summarise(OD_Int=sum(OD)*5/60) %>%
-  mutate(logOD_Int=log2(OD_Int),
-         Sample=paste(gsub('-','',recode(Strain,'OP50'='C','OP50-MR'='MR')),Day,sep='_'),
-         Group=paste(recode(Strain,'OP50'='C','OP50-MR'='MR'),recode(Metformin_mM,'0'='C','50'='T'),sep='_'),
-         DDay=paste0('D',Day)) %>%
+  mutate(logOD_Int=log2(OD_Int)) %>%
   gather(Measure,Value,OD_Int,logOD_Int)
 
 
 
 data.int.sum<-data.int %>%
   group_by(Measure,Day,Strain,Metformin_mM) %>%
-  summarise(Mean=mean(Value),SD=sd(Value))
+  summarise(Mean=mean(Value),SD=sd(Value)) %>%
+  group_by(Measure) %>%
+  mutate(C_norm=Mean-Mean[Day=='1' & Strain=='OP50-C' & Metformin_mM=='0'],
+         Prc=2^C_norm*100,
+         PrcSD=(2^SD-1)*100)
 
 
 
 
 
 
-contrasts<-read.contrasts2('!Contrasts_BacGrowth_Gut.xlsx')
+
+contrasts<-read.contrasts('!Contrasts_BacGrowth_Gut.xlsx')
 
 contrasts$Contrasts.table
 
@@ -148,48 +167,49 @@ contrasts.desc
 
 lmdata_S<-data.int%>%
   group_by(Measure,Day) %>%
-  do(hypothesise2(.,formula='Value~0+Group',contr.matrix)) %>%
-  left_join(contrasts.desc %>% select(-Day))%>%
-  mutate(ID=paste(Day,Contrast,sep='_'))
+  do(hypothesise(.,formula='Value~0+Group',contr.matrix)) %>%
+  getresults(contrasts.desc %>% select(-Day)) %>%
+  pluck('results') %>%
+  mutate(ID=paste(Day,Contrast,sep='_'),
+         Group='Any')
+
   
 lmdata_D<-data.int%>%
   group_by(Measure,Group,Strain,Metformin_mM) %>%
-  do(hypothesise2(.,formula='Value~0+DDay',contr.matrix)) %>%
-  left_join(contrasts.desc %>% select(-Strain,-Metformin_mM),by='Contrast') %>%
+  do(hypothesise(.,formula='Value~0+DDay',contr.matrix)) %>%
+  getresults(contrasts.desc %>% select(-Strain,-Metformin_mM)) %>%
+  pluck('results') %>%
   mutate(ID=paste(Group,Contrast,sep='_'))
+  
+  
 
-lmdata<-rbind(lmdata_S,lmdata_D)
-
-
-
-
-results<-lmdata %>%
-  adjustments %>%
+results<-rbind(lmdata_S,lmdata_D) %>%
   mutate(Contrast=factor(Contrast,levels=contrasts.desc$Contrast)) %>%
   select(Measure,ID,Day,Group,Strain,Metformin_mM,Contrast,Contrast_type,Description,everything())
 
 
+
 View(results)
 
+# 
+# results.m<-results %>%
+#   gather(Stat,Value,logFC:logFDR)
+# 
+# results.castfull<-results.m %>%
+#   arrange(ID,desc(Stat)) %>%
+#   unite(CS,ID,Stat) %>%
+#   select(Measure,CS,Value) %>%
+#   spread(CS,Value)
+# 
+# results.cast<-results.m %>%
+#   filter(Stat %in% c('logFC','FDR')) %>%
+#   arrange(ID,desc(Stat)) %>%
+#   unite(CS,ID,Stat) %>%
+#   select(Measure,CS,Value) %>%
+#   spread(CS,Value)
 
-results.m<-results %>%
-  gather(Stat,Value,logFC:logFDR)
-
-results.castfull<-results.m %>%
-  arrange(ID,desc(Stat)) %>%
-  unite(CS,ID,Stat) %>%
-  select(Measure,CS,Value) %>%
-  spread(CS,Value)
-
-results.cast<-results.m %>%
-  filter(Stat %in% c('logFC','FDR')) %>%
-  arrange(ID,desc(Stat)) %>%
-  unite(CS,ID,Stat) %>%
-  select(Measure,CS,Value) %>%
-  spread(CS,Value)
-
-head(results.castfull)
-head(results.cast)
+# head(results.castfull)
+# head(results.cast)
 
 
 write.csv(results,paste(odir,'/Growth_results.csv',sep=''),row.names = FALSE)
@@ -235,11 +255,14 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
+
+
 data.int.sum %>%
   filter(Measure=='OD_Int') %>%
   ggplot(aes(x=Day,y=Mean,color=Metformin_mM))+
   stat_summary(aes(group=interaction(Metformin_mM)),fun.y=sum, geom="line")+
   geom_errorbar(aes(ymin=Mean-SD,ymax=Mean+SD),width = 0.2)+
+  scale_colour_manual(name = Metlab,values =Metcols)+
   geom_point(size=2)+
   ylab('AUC, OD*h')+
   xlab('Day')+
@@ -250,8 +273,31 @@ data.int.sum %>%
   facet_grid(~Strain)
 
 
+
 dev.copy2pdf(device=cairo_pdf,
              useDingbats=FALSE,
              file=paste(odir,"/Growth_Summary_OD_int_by_day_line.pdf",sep=''),
+             width=5,height=3)
+
+
+data.int.sum %>%
+  filter(Measure=='OD_Int') %>%
+  ggplot(aes(x=Day,y=Prc,color=Metformin_mM))+
+  stat_summary(aes(group=interaction(Metformin_mM)),fun.y=sum, geom="line")+
+  geom_errorbar(aes(ymin=Prc-PrcSD,ymax=Prc+PrcSD),width = 0.2)+
+  scale_colour_manual(name = Metlab,values =Metcols)+
+  geom_point(size=2)+
+  ylab('Growth AUC vs OP50-C Day 1 Control, %')+
+  xlab('Day')+
+  scale_y_continuous(breaks=seq(0,300,by=50),limits=c(50,250))+
+  labs(color='Metformin, mM')+
+  geom_text(data=ODstars_day,aes(x=Day,y=ifelse(Metformin_mM=='0',240,250),label=as.character(pStars)),nudge_x = -0.5)+
+  geom_text(data=ODstars_treatment,aes(x=Day,label=as.character(pStars)),y=150,color='black')+
+  facet_grid(~Strain)
+
+
+dev.copy2pdf(device=cairo_pdf,
+             useDingbats=FALSE,
+             file=paste(odir,"/Growth_Summary_Prc_by_day_line.pdf",sep=''),
              width=5,height=3)
 

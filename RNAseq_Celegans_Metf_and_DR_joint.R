@@ -91,8 +91,6 @@ enr<-metf.KEGG.old %>%
   select(Type,Direction,Comparison,CD,ID,Description,everything())
 
 
-
-
 clustorder<-function(data,rows,variable,value,dst.method='euclidean',cl.method='ward.D2',fill=0,reverse=FALSE,scalesel='none'){
   heatsum<-data %>%
     ungroup %>%
@@ -114,7 +112,7 @@ clustorder<-function(data,rows,variable,value,dst.method='euclidean',cl.method='
   } else {
     stop(paste0('Unknown scaling!: ',scalsel), call. = FALSE)
   }
-    
+  
   d<-dist(heatmat,method = dst.method)
   h<-hclust(d,method=cl.method)
   ordered<-rownames(heatsum[h$order,])

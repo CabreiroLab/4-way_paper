@@ -29,11 +29,6 @@ pole2<-function(x,y) {
 }
 
 
-
-
-
-
-
 cwd<-"~/Dropbox/Projects/2015-Metformin/Biolog_Met_NGM/"
 setwd(cwd)
 
@@ -43,7 +38,6 @@ setwd(cwd)
 
 odir<-'Summary'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
-
 
 
 info<-read_csv('../Biolog/Biolog_metabolites_EcoCyc_Unique_PM1-PM5.csv') %>%
@@ -61,28 +55,33 @@ data<-read_csv('Data/Summary.csv') %>%
          SampleID=paste(Sample,Replicate,sep='_'),
          Sample=factor(Sample,
                         levels=c("OP50Sens_C","OP50Sens_T"),
-                        labels=c("OP50Sens_C","OP50Sens_T"))) %>%
+                        labels=c("OP50Sens_C","OP50Sens_T") ) ) %>%
   left_join(info[,c('Index','MetaboliteU')],by='Index') %>%
   select(File:Metformin_mM,Replicate,Well,Index,Sample:MetaboliteU,Metabolite=Name,EcoCycID:Group,G=Int_750nm_log,GR=a_log) %>%
   gather(Measure,Value,G,GR) %>%
   group_by(Plate,Type,Replicate,Group,Measure) %>%
   mutate(Value_ref=Value[Metabolite=='Negative Control'],
-         Value_norm=Value-Value_ref) %>%
+         Value_norm=ifelse(Metabolite=="Negative Control",Value,Value-Value_ref)) %>%
   ungroup %>%
   mutate_at(c('SampleID','Sample','Strain','Metformin_mM'),as.factor)
 
 
 
+
+data %>%
+  filter(Metabolite=="Negative Control")
+
+
 View(data)
 
 data.nc<-data %>%
-  filter(Metabolite!='Negative Control' & Plate !='PM5')
+  filter(Plate !='PM5')
 
 PM1PM2<-subset(info,Plate %in% c('PM1','PM2A'))
 
 
 
-
+#Unique sample descriptors
 bioinfo<-data.nc %>%
   group_by(SampleID,Sample,Strain,Metformin_mM) %>%
   summarise %>%
@@ -93,66 +92,36 @@ rownames(bioinfo)<-bioinfo$SampleID
 
 
 
-pcashape<- data.nc %>%
-  filter(Measure=='G') %>%
-  select(SampleID,Index,Value_norm) %>%
-  spread(Index,Value_norm) %>%
-  data.frame
+PCAres<-PCAprep(data.nc %>% filter(Measure=="G"),"SampleID","Index","Value_norm", bioinfo )
 
+HC<-PCAres$HC
+pca<-PCAres$pca
+ellipses<-PCAres$Ellipses
+pcadata<-PCAres$pcadata
+pcaloadings<-PCAres$Loadings
+pcashape=PCAres$pcashape
 
-rownames(pcashape)<-pcashape$SampleID
-pcashape$SampleID<-NULL
-
-
-hca_sample<-hclust(dist(pcashape,method="euclidean"),method="ward.D2")
-#hca_variable<-hclust(dist(t(log_data),method="manhattan"),method="complete")
-
-plot(hca_sample, labels=samples,
+plot(HC, labels=rownames(pcashape),
      hang=-1, main="Cluster Dendrogram", xlab="", sub="", cex=1)
+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Hierarchical_Clustering.pdf",sep=''),
              width=9,height=6)
 
-ir.pca <- prcomp(clean_data,
-                 center = TRUE,
-                 scale. = TRUE)
 
-write.csv(ir.pca[2],paste(odir,"/PCA_loadings.csv",sep=''))
+write.csv(pcaloading,paste(odir,"/PCA_loadings.csv",sep=''))
 
-plot(ir.pca,type='l')
+plot(pca,type='l')
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/PCA_components.pdf",sep=''),
              width=9,height=6)
 
-pcadata<-data.frame(ir.pca$x) %>%
-  rownames_to_column('SampleID') %>%
-  left_join(bioinfo)
-
-
-
-
-
-pcaresult<-summary(ir.pca)$importance
-PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
-PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
-
-
-
-ellipses<-pcadata %>%
-  group_by(Sample,Strain,Metformin_mM) %>%
-  do(getellipse(.$PC1,.$PC2,1) ) %>%
-  data.frame
-  
-# 
-# pcadata$Metformin_mM<-as.factor(pcadata$Metformin_mM)
-# ellipses$Metformin_mM<-as.factor(ellipses$Metformin_mM)
-
 ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
-  xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
-  ylab(paste('PC2 - ',PC2prc,'% of variance',sep=''))+
+  xlab(paste('PC1 - ',PCAres$PC1prc,'% of variance',sep=''))+
+  ylab(paste('PC2 - ',PCAres$PC2prc,'% of variance',sep=''))+
   geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Sample),linetype=Metformin_mM),size=1)+ 
   geom_point(aes(fill=factor( ifelse(Metformin_mM==0,Strain, NA ) ) ),size=5,stroke=1,shape=21)+
-  scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
+  scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2) )+
   scale_fill_discrete(na.value=NA, guide="none")+
   guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
   #geom_text(aes(label=Sample))+
@@ -165,45 +134,11 @@ dev.copy2pdf(device=cairo_pdf,
              width=12,height=9)
 
 
-
-head(data.n)
-
-#Heatmap
-heatshape<- data.nc %>%
-  filter(Measure=='G') %>%
-  select(SampleID,MetaboliteU,Value_norm) %>%
-  spread(SampleID,Value_norm) %>%
-  data.frame
-
-
-rownames(heatshape)<-heatshape$MetaboliteU
-
-heatshape$MetaboliteU<-NULL
-head(heatshape)
-
-
-
-#Order anotation by heatmap colnames
-hanot<-bioinfo[colnames(heatshape),] %>%
-  select(Metformin_mM)
-
-ha<-HeatmapAnnotation(df=hanot, col = list(Metformin_mM=c('50'='black','0'='white')))
-
-heatshape.sc<-t(scale(t(heatshape)))
-
-rownames(heatshape.sc)<-NULL
-
-#make anotated heatmap
-Heatmap(heatshape.sc,name = 'Z-score',
-        #col=bgg4,
-        column_names_side = 'top',
-        clustering_method_rows='ward.D2',
-        #clustering_method_columns ='ward.D2',
-        top_annotation = ha,
-        row_dend_reorder = TRUE,
-        column_dend_reorder = TRUE,
-        row_names_max_width = unit(10, "cm"))
-
+data.nc %>%
+  filter(Measure=="G") %>%
+  HMap("SampleID","Index","Value_norm",
+       bioinfo %>% select(Metformin_mM) %>% rename(`Metformin, mM`=Metformin_mM),
+       cols=list("Metformin, mM"=c('50'='black','0'='white')) )
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Heatmap.pdf",sep=''),
@@ -218,10 +153,7 @@ dev.copy2pdf(device=cairo_pdf,
 #Get negative control wells
 head(data.nc)
 
-
-
-
-contrasts<-read.contrasts2('!Contrasts.xlsx')
+contrasts<-read.contrasts('!Contrasts.xlsx')
 
 contrasts.desc<-contrasts$Contrasts.table %>%
   select(Description:Strain)
@@ -229,64 +161,88 @@ contrasts.desc<-contrasts$Contrasts.table %>%
 contr.matrix<-contrasts$Contrasts.matrix
 contr.matrix
 
+contrasts.desc
+
+
+#Carboxylic acids to remove
+coxy<-c('Itaconic Acid','Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')
+
+selmets<-info %>%
+  filter(!(Plate %in% c('PM3B','PM4A') &
+             Metabolite %in% PM1PM2$Metabolite ) &
+           !Metabolite %in% c('Negative Control',coxy))
 
 
 results.all<-data.nc %>%
+  filter(Metabolite !="Negative Control") %>%
+  #filter(!MetaboliteU %in% selmets$MetaboliteU) %>%
   group_by(Measure,Group,Plate,Well,Index,Metabolite,MetaboliteU,EcoCycID,KEGG_ID) %>%
-  do(hypothesise2(.,'Value_norm~0+Sample',contr.matrix)) %>%
+  do(hypothesise(.,'Value_norm~0+Sample',contr.matrix)) %>%
   getresults(contrasts.desc,c("Measure"))
 
-results %>%
-  filter(Contrast=="T-C" & Measure=="G") %>%
-  arrange(desc(logFC)) %>%
-  select(Measure,Index,MetaboliteU,logFC,SE,p.value,FDR)  %>%
-  View()
+
+#Separate results
+results<-results.all$results %>%
+  filter(MetaboliteU %in% selmets$MetaboliteU)
 
 
-
-results%>%
-  group_by(Measure,Contrast) %>%
-  summarise(Total=n(),
-            Ant=sum(logFC>0 & FDR<=0.05,na.rm=TRUE),
-            Syn=sum(logFC<0 & FDR<=0.05,na.rm=TRUE),
-            All=sum(FDR<=0.05,na.rm=TRUE))
-
-
-logFDRbreaks<-c(-1,1.3,2,3,14)
-logFDRbins<-c('N.S.','p<0.05','p<0.01','p<0.001')
-
-
-
-results<-results.all$results
-results.cast<-results.all$cast %>% filter(Measure=='G')
+results.cast<-results.all$cast %>% filter(Measure=='G') %>%
+  filter(MetaboliteU %in% selmets$MetaboliteU)
 results.castfull<-results.all$castfull %>%
+  filter(MetaboliteU %in% selmets$MetaboliteU) %>%
   filter(Measure=='G') %>%
-  mutate(`T-C_logFDR_bin`=cut(`T-C_logFDR`, breaks=logFDRbreaks,labels=logFDRbins),
-         Pole=ifelse(`C_logFC`>0,
+  mutate(Pole=ifelse(`C_logFC`>0,
                      pole2(`C_logFC`,`T_logFC`),
                      pole2(`C_logFC`,`T_logFC`)+0.5),
          Pole=ifelse(Pole>0.625,Pole-1,Pole),
          Pole360=Pole*360)
 
-results.castfull.c<-results.all$castfull
-
 results.multi<-results.all$multi %>% filter(Measure=='G')
 
 
-write.csv(results,paste(odir,'/Ecoli_results.csv',sep=''),row.names = FALSE)
+ncresults<-c('Negative Control','L-Arabinose','Acetoacetic Acid','Phosphono Acetic Acid')
+
+
+# oldresults<-results.all$results %>%
+#   filter(Contrast!="T-C_none" ) %>% #& Metabolite!="Negative Control"
+#   group_by(Measure,MetaboliteU) %>%
+#   mutate(FDR=p.adjust(p.value,method = "fdr"))%>%
+#   group_by(Measure,Contrast) %>%
+#   summarise(Total=n(),
+#             Ant=sum(logFC>0 & FDR<=0.05,na.rm=TRUE),
+#             Syn=sum(logFC<0 & FDR<=0.05,na.rm=TRUE),
+#             All=sum(FDR<=0.05,na.rm=TRUE))
+# 
+# oldresults %>%
+#   write_csv('~/Dropbox/Ecoli_old_results.csv')
+
+
+results %>%
+  filter(Metabolite=="Negative Control" & Measure=="G")
+
+
+results %>%
+  filter(Contrast=="T-C" & Measure=="G") %>%
+  arrange(desc(logFC)) %>%
+  select(Measure,Index,Metabolite,MetaboliteU,logFC,SE,p.value,FDR)  %>%
+  filter(Metabolite=="Negative Control") %>%
+  View()
+
+
+
+write.csv(results,paste0(odir,'/Ecoli_results.csv'),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/Ecoli_results_sidebyside.csv',sep=''),row.names = FALSE)
 write.csv(results.castfull,paste(odir,'/Ecoli_results_sidebyside_full.csv',sep=''),row.names = FALSE)
 
 
 
 
-
-
-
-
+  
 results.celr<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv') %>%
   filter(! Index %in% c('Controls-A1','Controls-B1')) %>%
   select(Index,logFC:logFDR_bin)
+
+
 
 celvars<-base::setdiff(colnames(results.celr),'Index')
 
@@ -299,8 +255,7 @@ results.castcomb<-results.castfull %>%
   left_join(results.cels) %>%
   arrange(desc(`T-C_logFC`))
 
-View(results.castcomb)
-
+#View(results.castcomb)
 
 #With growth rate
 results.castcomb.c<-results.castfull.c %>%
@@ -311,23 +266,6 @@ results.castcomb.c<-results.castfull.c %>%
 write.csv(results.castcomb,paste(odir,'/Combined_results_sidebyside_full.csv',sep=''),row.names = FALSE)
 
 
-
-
-#Pick data to show
-
-#Only filtered
-#Carboxylic acids to remove
-coxy<-c('Itaconic Acid','Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')
-selmets<-info %>%
-  filter(!(Plate %in% c('PM3B','PM4A') & Metabolite %in% PM1PM2$Metabolite ) & !Metabolite %in% c('Negative Control',coxy) ) %>%
-  select(Group,Plate,Well,Metabolite,MetaboliteU)
-
-
-selectcast<-subset(results.castcomb,MetaboliteU %in% selmets$MetaboliteU )
-selectcast.c<-subset(results.castcomb.c,MetaboliteU %in% selmets$MetaboliteU )
-
-
-dim(selectcast)
 
 metorder<-as.character(results.castcomb$MetaboliteU)
 
@@ -341,155 +279,19 @@ data.nc %>%
   ylab('Growth logFC vs NGM')+
   xlab('Metabolite')+
   coord_flip()
+
+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Ecoli_logFC_tall_raw.pdf",sep=''),
              width=9,height=50)
 
 
 
-#Volcano plots
-
-ggplot(selectcast,aes(x=`T-C_logFC`,y=`T-C_logFDR`,color=-Cel_logFC))+
-  geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-  geom_errorbarh(aes(xmin=`T-C_NE`,xmax=`T-C_PE`),alpha=erralpha,color=errcolor,height=0)+
-  geom_point(aes(size=abs(`Cel_logFC`) ))+
-  scale_colour_gradientn(colours = gradcols,
-                         breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
-  labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  scale_size(range = c(0.25, 7),name=maincomp)+
-  ylab('-logFDR')+
-  xlab('Metabolite - metformin interaction as growth logFC vs NGM')+
-  labs(color='Significance (FDR)')
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Volcano_Ecoli_Growth.pdf",sep=''),
-             width=12,height=9)
 
 
-
-# ggplot(selectcast.c,aes(x=`GR_T-C_logFC`,y=`GR_T-C_logFDR`,color=-Cel_logFC))+
-#   geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-#   geom_errorbarh(aes(xmin=`GR_T-C_NE`,xmax=`GR_T-C_PE`),alpha=erralpha,color=errcolor,height=0)+
-#   geom_point(aes(size=abs(`Cel_logFC`) ))+
-#   scale_colour_gradientn(colours = gradcols,
-#                          breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
-#   labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-#   scale_size(range = c(0.25, 7),name=maincomp)+
-#   ylab('-logFDR')+
-#   xlab('Doubling rate difference (Treatment-Control), log2(OD)/h')+
-#   labs(color='Significance (FDR)')
-# dev.copy2pdf(device=cairo_pdf,
-#              file=paste(odir,"/Volcano_Ecoli_GrowthRate.pdf",sep=''),
-#              width=12,height=9)
+#Hasn't been updated from here on
 
 
-
-
-#Growth rate analysis
-
-fit<-lm(GR_T_logFC~GR_C_logFC,selectcast.c)
-lmeq<-lm_eqn(fit)
-a<-fit$coefficients[[2]]
-b<-fit$coefficients[[1]]
-
-thres<-0.05
-
-ggplot(selectcast.c,aes(y=GR_T_logFC,x=GR_C_logFC,color=-Cel_logFC))+
-  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_abline(aes(intercept=b,slope=a),alpha=1,color='red')+
-  geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
-  geom_errorbar(aes(ymin=GR_T_NE,ymax=GR_T_PE),alpha=erralpha,color=errcolor,width=0)+
-  geom_errorbarh(aes(xmin=GR_C_NE,xmax=GR_C_PE),alpha=erralpha,color=errcolor,height=0)+
-  ggtitle(paste('Scatterplot of metformin and metabolite supplementation effects ',grp,sep=''),
-          subtitle = paste('Metabolites with FDR<',thres,' are marked',sep='') )+
-  
-  geom_point(size=3)+#aes(size=abs(Cel_logFC))
-  #coord_cartesian(xlim=c(xmin,xmax),ylim = c(ymin,ymax))+
-  scale_x_continuous(breaks=seq(-10,10,by=1))+
-  scale_y_continuous(breaks=seq(-10,10,by=1))+
-  
-  xlab('Doubling rate - Control, log2(OD)/h')+
-  ylab('Doubling rate - +50mM Metformin, log2(OD)/h')+
-  #eval(parse(text = intfdr)) < thres & abs( eval(parse(text = intvar)) ) > 0.75 
-  # geom_text_repel(aes(label=ifelse(Cel_FDR<thres, as.character(Metabolite),'')),
-  #                 size=lblsize,nudge_y = 0.3,
-  #                 force=1,
-  #                 segment.colour=errcolor,
-  #                 segment.alpha =segalpha)+
-  scale_colour_gradientn(colours = gradcols,
-                         breaks=cbrks,limits=c(-amp,amp))+
-  labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  #scale_size(range = c(0.25, 7),name=maincomp)+
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Scatter_Control-Treatment_Complete_GrowthRate_Celegans.pdf",sep=''),
-             width=13,height=9, useDingbats=FALSE)
-
-
-
-#Growth rate and growth comparison
-
-head(selectcast.c)
-
-ggplot(selectcast.c,aes(x=`G_T-C_logFC`,y=`GR_T-C_logFC`,color=-Cel_logFC) )+
-  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  #geom_abline(aes(intercept=b,slope=a),alpha=1,color='red')+
-  #geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
-  geom_errorbar(aes(ymin=`GR_T-C_NE`,ymax=`GR_T-C_PE`),alpha=erralpha,color=errcolor,width=0)+
-  geom_errorbarh(aes(xmin=`G_T-C_NE`,xmax=`G_T-C_PE`),alpha=erralpha,color=errcolor,height=0)+
-  geom_point(aes(size=abs(Cel_logFC)))+
-  geom_text_repel(aes(label=ifelse(Cel_FDR<thres, as.character(Metabolite),'')),
-                  size=lblsize,nudge_y = 0.3,
-                  force=1,
-                  segment.colour=errcolor,
-                  segment.alpha =segalpha)+
-  ylab('Doubling rate difference (Treatment-Control), log2(OD)/h')+
-  xlab('Metabolite - metformin interaction as growth logFC vs NGM')+
-  scale_colour_gradientn(colours = gradcols,
-                         breaks=cbrks,limits=c(-amp,amp))+
-  labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  scale_size(range = c(0.25, 7),name=maincomp)+
-  coord_cartesian(xlim=c(-3,3),ylim = c(-2,2))
-
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Scatter_GrowthRate_vs_Growth_vs_Celegans.pdf",sep=''),
-             width=13,height=9, useDingbats=FALSE)
-
-
-#Driving effects for interaction
-ggplot(selectcast,aes(y=`T-C_logFC`,x=Pole360,color=-Cel_logFC))+
-  geom_point()+
-  geom_point(aes(size=abs(Cel_logFC)))+
-  geom_text_repel(aes(label=ifelse(Cel_FDR<0.05, as.character(Metabolite),'')),
-                  size=lblsize,nudge_y = 0.3,
-                  force=1,
-                  segment.colour=errcolor,
-                  segment.alpha =segalpha)+
-  ggtitle('Breakdown of driving components for metabolite-metformin interaction')+
-  #scale_x_discrete(labels=c("-90"="-T","-45"="-TC","0" = "C", "45" = "TC","90" = "T","135"="T-C","180"="-C","225"="-T-C","270"="-T"))+
-  scale_x_continuous(breaks=seq(-135,225,by=45),labels=c("-T-C","-T","-TC","C","TC","T","T-C","-C","-T-C")  )+
-  scale_y_continuous(breaks=seq(-4,4,by=1),limits = c(-3,3) )+
-  scale_colour_gradientn(colours = gradcols,
-                         breaks=cbrks,limits=c(-amp,amp))+
-  labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  xlab('Driving component')+
-  ylab('Metabolite - metformin interaction as growth logFC vs NGM')+
-  scale_size(range = c(0.25, 7),name=maincomp)
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Celegans_Ecoli_Driving_effects_for_interaction_CelSignificant.pdf",sep=''),
-             width=16,height=12, useDingbats=FALSE)
-
-
-
-
-
-#Enrichment
 #Generate tables for KEGG enrichment
 
 

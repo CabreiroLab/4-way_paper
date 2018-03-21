@@ -176,6 +176,9 @@ data.m<-melt(data,measure.vars = spots,variable.name = 'Spot',value.name = 'log1
 data.m$log10SA<-ifelse(data.m$log10SA=='NaN',NA,data.m$log10SA)
 head(data.m)
 
+
+
+
 norm<-read.xlsx2('Filipe POI analysis.xlsx',sheetName='Volumes',
                     header=TRUE,endRow=19,check.names = FALSE,
                     colClasses=c(rep("character",5), rep("numeric", 313)))
@@ -384,10 +387,7 @@ dev.copy2pdf(device=cairo_pdf,
              width=12,height=9)
 
 
-
-
 #Heatmap
-
 prot.cl<-subset(prot.c,Sample %in% samples.clean)
 head(prot.clean)
 

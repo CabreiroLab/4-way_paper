@@ -16,20 +16,16 @@ setwd(cwd)
 odir<-'Summary_resistance'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
-
 #save.image('BGA_resistance.RData')
 #load('BGA_resistance.RData')
 
-
 strainlist<-c('OP50-C','OP50-MR','OP50-R1','OP50-R2')
 metf<-c("0","25","50","75","100","150")
-
 
 NormNames<-data.frame(Normalisation=c("Value","Norm_C","Norm_M","Norm_CM"), NormName=c("Absolute","By OP50-C","By Metformin=0","By OP50-C and Metformin=0") )
 MeasNames<-data.frame(Measure=c("AUC","logAUC","Dph"),
                       MeasName=c("Growth AUC, OD*h","Growth log AUC, log2(OD*h)","Growth rate, doubling/h"),
                       MeasShort=c("Growth AUC","Growth log AUC","Growth rate") )
-
 
 data<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Resistance/Summary.csv') %>%
   filter(!is.na(Strain)) %>%
@@ -53,6 +49,20 @@ data<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Resistance/Summary.c
   left_join(MeasNames)
 
 
+
+
+data.sum<-data %>%
+  group_by(Measure,Normalisation,Strain,Metformin_mM,NormName,MeasName,MeasShort) %>%
+  summarise(Mean=mean(Value),
+            SD=sd(Value)) %>%
+  mutate(PE=Mean+SD,
+         NE=Mean-SD,
+         Prc=2^Mean*100,
+         PrcNE=2^NE*100,
+         PrcPE=2^PE*100)
+  
+  
+
 data %>%
   select(-c(NormName,MeasName,MeasShort)) %>%
   write_csv(paste0(odir,"/Raw_data_Summary.csv"))
@@ -67,7 +77,6 @@ data_ts<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Resistance/Data.c
          Strain=factor(Strain,levels=strainlist),
          Time_s=as.numeric(Time_s),
          Time_h=Time_s/3600)
-
 
 
 data_ts %>%
@@ -96,12 +105,12 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-data.sum<-data_ts %>%
+datats.sum<-data_ts %>%
   group_by(Strain,Metformin_mM,Time_h) %>%
   summarise(OD_Mean=mean(OD),
             OD_SD=sd(OD))
 
-ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
+ggplot(datats.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   geom_line()+
   geom_ribbon(aes(ymin=OD_Mean-OD_SD,
                   ymax=OD_Mean+OD_SD),alpha=0.5,color=NA)+
@@ -147,7 +156,6 @@ map2(paste0(odir,"/Growth_comparisons_",as.character(Boxplots$Measure),"_",as.ch
 
 
 
-
 stat<-data %>%
   group_by(Metformin_mM,Measure,MeasName,MeasShort,Normalisation,NormName) %>%
   do(tidy(lm(Value~0+Strain,data=.))) %>%
@@ -160,7 +168,7 @@ stat<-data %>%
          Prc=2^logFC*100,
          PrcNE=2^NE*100,
          PrcPE=2^PE*100,
-         pStars=pStars(p.value)) 
+         pStars=pStars(p.value))
 
 # Metformin_mM=str_extract(term,'[[:digit:]]{1,3}'),
 # Metformin_mM=factor(Metformin_mM,levels=metf ),
@@ -217,6 +225,7 @@ Strainlab<-"Strain"
 
 
 PlotComp<-function(data,stat,meas,measname) {
+  
   stars<-stat %>%
     filter(Measure==meas,Normalisation=="Norm_C")
   
@@ -234,7 +243,7 @@ PlotComp<-function(data,stat,meas,measname) {
     geom_line(aes(group=interaction(Strain)))+
     #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
     geom_point()+
-    ggtitle("Significance shown for differences vs OP50-C")+
+    #ggtitle("Significance shown for differences vs OP50-C")+
     scale_colour_manual(name = Strainlab,values = Straincols)+
     scale_fill_manual(name = Strainlab,values = Straincols)+
     ylab(paste0(measname," vs OP50-C Control, %") )+
@@ -245,17 +254,17 @@ PlotComp<-function(data,stat,meas,measname) {
 
 
 
-stat %>%
+data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>% 
   PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
 
 
-Compplots<-stat %>%
+Compplots<-data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
   group_by(Measure) %>%
   do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) )
 
-Compwrap<-stat %>%
+Compwrap<-data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
   group_by(Measure) %>%
   do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain))
@@ -263,7 +272,7 @@ Compwrap<-stat %>%
 
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),".pdf"),
      Compplots$plot,
-     width=5,height=4, useDingbats=FALSE, ggsave)
+     width=5,height=3, useDingbats=FALSE, ggsave)
 
 
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),".pdf"),

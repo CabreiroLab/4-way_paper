@@ -55,6 +55,19 @@ data<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Mutants/Summary.csv'
   left_join(MeasNames)
 
 
+data.sum<-data %>%
+  group_by(Measure,Normalisation,Strain,Metformin_mM,NormName,MeasName,MeasShort) %>%
+  summarise(Mean=mean(Value),
+            SD=sd(Value)) %>%
+  mutate(PE=Mean+SD,
+         NE=Mean-SD,
+         Prc=2^Mean*100,
+         PrcNE=2^NE*100,
+         PrcPE=2^PE*100)
+
+
+
+
 data %>%
   select(-c(NormName,MeasName,MeasShort)) %>%
   write_csv(paste0(odir,"/Raw_data_Summary.csv"))
@@ -98,12 +111,12 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-data.sum<-data_ts %>%
+datats.sum<-data_ts %>%
   group_by(Strain,Metformin_mM,Time_h) %>%
   summarise(OD_Mean=mean(OD),
             OD_SD=sd(OD))
 
-ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
+ggplot(datats.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   geom_line()+
   geom_ribbon(aes(ymin=OD_Mean-OD_SD,
                   ymax=OD_Mean+OD_SD),alpha=0.5,color=NA)+
@@ -112,12 +125,12 @@ ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   scale_colour_manual(name = Metlab,values = Metcols)+
   scale_fill_manual(name = Metlab,values = Metcols)+
   scale_x_continuous(breaks=seq(0,18,by=6))+
-  facet_wrap(~Strain,ncol=2)
+  facet_wrap(~Strain,ncol=4)
 
 dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Growth_Summary.pdf",sep=''),
+             file=paste(odir,"/Growth_Summary_horizontal.pdf",sep=''),
              useDingbats=FALSE,
-             width=5,height=6)
+             width=6,height=3.5)
 
 
 PlotBox<-function(data,yvar,ytitle,title) {
@@ -240,7 +253,7 @@ PlotComp<-function(data,stat,meas,measname) {
     geom_line(aes(group=interaction(Strain)))+
     #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
     geom_point()+
-    ggtitle("Significance shown for differences vs OP50-C")+
+    #ggtitle("Significance shown for differences vs OP50-C")+
     scale_colour_manual(name = Strainlab,values = Straincols)+
     scale_fill_manual(name = Strainlab,values = Straincols)+
     # scale_fill_viridis(discrete=TRUE)+
@@ -254,27 +267,27 @@ PlotComp<-function(data,stat,meas,measname) {
 }
 
 
-stat %>%
+data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>% 
   PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
 
 
-Compplots<-stat %>%
+Compplots<-data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
   group_by(Measure) %>%
   do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) )
 
-Compwrap<-stat %>%
+Compwrap<-data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
   group_by(Measure) %>%
   do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain))
 
  
-map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),".pdf"),
+map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_SD.pdf"),
      Compplots$plot,
-     width=5,height=4, useDingbats=FALSE, ggsave)
+     width=5,height=3, useDingbats=FALSE, ggsave)
 
 
-map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),".pdf"),
+map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),"_SD.pdf"),
      Compwrap$plot,
      width=9,height=6, useDingbats=FALSE, ggsave)
