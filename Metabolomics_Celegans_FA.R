@@ -8,44 +8,16 @@ library(RColorBrewer)
 library(ComplexHeatmap)
 library(circlize)
 
-library(ggthemes)
 
 
-devtools::install_github("PNorvaisas/PFun")
+
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-
-theme_Publication <- function(base_size=14) {
-  (theme_foundation(base_size=base_size)
-   + theme(plot.title = element_text(face = "bold",
-                                     size = rel(1.2), hjust = 0.5),
-           text = element_text(),
-           panel.background = element_rect(colour = NA),
-           plot.background = element_rect(colour = NA),
-           #panel.border = element_rect(colour = NA),
-           axis.title = element_text(face = "bold",size = rel(1)),
-           axis.title.y = element_text(angle=90,vjust =2),
-           axis.title.x = element_text(vjust = -0.2),
-           axis.text = element_text(), 
-           axis.line = element_line(colour="black"),
-           axis.ticks = element_line(),
-           panel.grid.major = element_line(colour="#f0f0f0"),
-           panel.grid.minor = element_blank(),
-           legend.key = element_rect(colour = NA),
-           #legend.position = "bottom",
-           #legend.direction = "horizontal",
-           #legend.key.size= unit(0.2, "cm"),
-           #legend.margin = unit(0, "cm"),
-           legend.title = element_text(face="italic"),
-           #plot.margin=unit(c(10,5,5,5),"mm"),
-           strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
-           strip.text = element_text(face="bold")
-   ))
-  
-}
-
-
-theme_set(theme_Publication())
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
 setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
@@ -53,10 +25,8 @@ setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
 #save.image('Metabolomics_Celegans_FA.RData')
 #load('Metabolomics_Celegans_FA.RData')
 
-
 odir<-'Summary_Celegans_FA'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
-
 
 
 strains<-c('OP50','OP50-MR','OP50-crp','nhr-49')
@@ -85,69 +55,33 @@ met<-read_xlsx('Metformin FA worm data.xlsx',sheet='Complete_table') %>%
   mutate_at(c('Sample','Name','Metformin_mM','Group','Replicate','Metabolite','Common name','Clean name'),as.factor)
 
 
+met %>%
+  write_csv(paste0(odir,"/Raw_data.csv"))
+
+
+
 metinfo<-met %>%
-  group_by(Sample,Group,Strain,Metformin_mM,Replicate) %>%
+  group_by(Sample,Group,Strain,Metformin_mM) %>%
   summarise %>%
   data.frame
 
 rownames(metinfo)<-metinfo$Sample
 
-
-metslm<-met %>%
-  filter(Strain %in%  c('OP50','OP50-MR')) %>%
-  select(Sample,Metabolite,logConc_fill) %>%
-  spread(Metabolite,logConc_fill) %>%
-  data.frame
+  
+PCAres<-met %>%
+  filter(Strain %in%  c('OP50','OP50-crp')) %>%
+  PCAprep("Sample","Metabolite","logConc_fill",metinfo)
 
 
 
 
-rownames(metslm)<-metslm$Sample
-head(metslm)
-
-
-pca.dat<-metslm %>%
-  select(-Sample)
-
-
-#Find compounds with missing values
-miss.cols<-apply(pca.dat, 2, function(x) any(is.na(x)))
-miss.rows<-apply(pca.dat, 1, function(x) any(is.na(x)))
-
-missing.cols<-names(miss.cols[miss.cols==TRUE])
-missing.rows<-rownames(metslm)[miss.rows==TRUE]
-
-missing.cols
-missing.rows
-
-cleancols<-setdiff(colnames(pca.dat),missing.cols)
-
-pca.dat<-pca.dat[,cleancols]
-
-
-ir.pca <- prcomp(pca.dat,
-                 center = TRUE,
-                 scale. = TRUE)
-
-
-plot(ir.pca,type='l')
-
-
-pcadata<-data.frame(ir.pca$x) %>%
-  rownames_to_column('Sample') %>%
-  left_join(metinfo)
-
-
-pcaresult<-summary(ir.pca)$importance
-PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
-PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
+ellipses<-PCAres$Ellipses
+pcadata<-PCAres$pcadata
+PC1prc<-PCAres$PC1prc
+PC2prc<-PCAres$PC2prc
 
 # write.csv(pcadata,paste(odir,'/PCA_data_OP50_OP50-MR.csv',sep=''))
 # write.csv(pcaresult,paste(odir,'/PCA_variance_OP50_OP50-MR.csv',sep=''))
-
-ellipses<-pcadata %>%
-  group_by(Strain,Group,Metformin_mM) %>%
-  do(getellipse(.$PC1,.$PC2,1))
 
 ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
   xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
@@ -160,10 +94,12 @@ ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
-
 dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_OP50_OP50-MR.pdf",sep=''),
+             file=paste0(odir,"/PCA_OP50_OP50-crp.pdf"),
              width=12,height=9)
+
+
+
 
 
 

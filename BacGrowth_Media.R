@@ -5,8 +5,6 @@ library(broom)
 library(PFun)
 
 
-theme_set(theme_Publication())
-
 
 cwd<-"~/Dropbox/Projects/Metformin_project/Bacterial Growth Assays/"
 setwd(cwd)
@@ -21,8 +19,18 @@ odir<-'Summary_Media'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-medias<-c('Bacto peptone','Soy peptone','LB','MRS')
 
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
+
+
+
+
+
+
+medias<-c('Bacto peptone','Soy peptone','LB','MRS')
 metf<-c("0","25","50","75","100","150")
 
 
@@ -65,7 +73,7 @@ head(data_ts)
 
 Metcols <- colorRampPalette(c("red", "blue4"))(6)
 names(Metcols) <- levels(data$Metformin_mM)
-Metlab<-'Metformin, mM'
+Metlab<-'Metformin,\nmM'
 
 ggplot(data_ts,aes(x=Time_h,y=OD,color=Metformin_mM))+
   geom_line(aes(group=interaction(Replicate,TReplicate,Metformin_mM)))+
@@ -92,13 +100,12 @@ ggplot(data.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   ylab('OD')+
   scale_colour_manual(name = Metlab,values = Metcols)+
   scale_fill_manual(name = Metlab,values = Metcols)+
-  scale_x_continuous(breaks=seq(0,18,by=2))+
+  scale_x_continuous(breaks=seq(0,18,by=6))+
+  scale_y_continuous(breaks=seq(0,0.5,by=0.1))+
   facet_wrap(~Media)
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Growth_Summary.pdf",sep=''),
-             useDingbats=FALSE,
-             width=6,height=4)
+ggsave(file=paste0(odir,"/Growth_Summary.pdf"),
+             width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 
@@ -153,7 +160,6 @@ Medcols <- c("red","blue4", viridis::viridis(4,option="magma"))
 names(Medcols) <- medias
 Medlab<-"Media"
 
-
 PlotComp<-function(data,stat,meas,measname) {
   stars<-stat %>%
     filter(Measure==meas & Normalisation=="Norm_M")
@@ -178,9 +184,8 @@ PlotComp<-function(data,stat,meas,measname) {
     ylab(paste0(measname," vs Control, %") )+
     xlab("Metformin, mM")+
     geom_text(data=stars,
-              aes(label=pStars,y=20-as.numeric(Media)*4 ),nudge_y = 110, show.legend = FALSE)
+              aes(label=pStars,y=20-as.numeric(Media)*4 ),nudge_y = 110, show.legend = FALSE,size=5)
 }
-
 
 
 stat %>%
@@ -201,11 +206,11 @@ Compwrap<-stat %>%
 
 map2(paste0(odir,"/Growth_comparison_vs_Control_condensed_",as.character(Compplots$Measure),".pdf"),
      Compplots$plot,
-     width=5,height=3, useDingbats=FALSE, ggsave)
+     width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial", ggsave)
 
 
 map2(paste0(odir,"/Growth_comparison_vs_Control_",as.character(Compwrap$Measure),".pdf"),
      Compwrap$plot,
-     width=7,height=5, useDingbats=FALSE, ggsave)
+     width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial", ggsave)
 
 

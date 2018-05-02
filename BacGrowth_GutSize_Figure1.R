@@ -5,11 +5,15 @@ library(RColorBrewer)
 library(ggrepel)
 
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
-theme_set(theme_Publication())
+#theme_set(theme_Publication())
+#New default theme
+theme_set(theme_PN(base_size = 12,base_family = "Arial"))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
 cwd<-"~/Dropbox/Projects/Metformin_project/Bacterial Growth Assays/"
@@ -41,7 +45,7 @@ stars_treat<-stars %>%
 
 
 Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
-names(Metcols) <- levels(data_ts$Metformin_mM)
+names(Metcols) <- levels(data$Metformin_mM)
 Metlab<-'Metformin, mM'
 
 
@@ -52,16 +56,15 @@ data %>%
   geom_point(size=2)+
   scale_colour_manual(name = Metlab,values =Metcols)+
   labs(y = expression(paste("Gut size (normalised), ",mu, "m"^2)),
-       x='Day',
-       color='Metformin, mM')+
+       x='Day')+
   #scale_y_continuous(breaks=0:10,limits=c(2,4.2))+
-  geom_text(data=stars_day,aes(x=Day,y=ifelse(Metformin_mM=='0',32,35),label=as.character(Stars)),nudge_x = -0.5,legend=FALSE)+
-  geom_text(data=stars_treat,aes(x=Day,label=as.character(Stars)),y=27,color='black',legend=FALSE)+
-  facet_grid(~Strain)
+  geom_text(data=stars_day,aes(x=Day,y=ifelse(Metformin_mM=='0',32,35),label=as.character(Stars)),nudge_x = -0.5,size=5,show.legend=FALSE)+
+  geom_text(data=stars_treat,aes(x=Day,label=as.character(Stars)),y=27,color='black',size=5,show.legend=FALSE)+
+  facet_grid(~Strain)+
+  theme(legend.position = "top")
 
+#,useDingbats=FALSE
+ggsave(file=paste0(odir,"/Gut_size.pdf"),device=cairo_pdf,family="Arial",
+             width=55,height=41,units="mm",scale=2)
 
-dev.copy2pdf(device=cairo_pdf,
-             useDingbats=FALSE,
-             file=paste(odir,"/Gut_size.pdf",sep=''),
-             width=5,height=3)
 

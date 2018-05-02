@@ -5,12 +5,18 @@ library(RColorBrewer)
 library(ggrepel)
 
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
 
-theme_set(theme_Publication())
+#theme_set(theme_Publication())
+
+
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
 cwd<-"~/Dropbox/Projects/Metformin_project/Bacterial Growth Assays/"
@@ -138,6 +144,10 @@ data.int<-data %>%
 
 
 
+data.int %>%
+  filter(Measure=='OD_Int' & Strain=='OP50-C' & Metformin_mM==0)
+
+
 data.int.sum<-data.int %>%
   group_by(Measure,Day,Strain,Metformin_mM) %>%
   summarise(Mean=mean(Value),SD=sd(Value)) %>%
@@ -149,7 +159,8 @@ data.int.sum<-data.int %>%
 
 
 
-
+data.int.sum %>%
+  filter(Measure=='logOD_Int' & Strain=='OP50-C' & Metformin_mM==0)
 
 
 contrasts<-read.contrasts('!Contrasts_BacGrowth_Gut.xlsx')
@@ -281,23 +292,21 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 data.int.sum %>%
-  filter(Measure=='OD_Int') %>%
+  filter(Measure=='logOD_Int') %>%
   ggplot(aes(x=Day,y=Prc,color=Metformin_mM))+
+  geom_hline(yintercept = 100,color='gray70',linetype='longdash')+
   stat_summary(aes(group=interaction(Metformin_mM)),fun.y=sum, geom="line")+
   geom_errorbar(aes(ymin=Prc-PrcSD,ymax=Prc+PrcSD),width = 0.2)+
   scale_colour_manual(name = Metlab,values =Metcols)+
   geom_point(size=2)+
   ylab('Growth AUC vs OP50-C Day 1 Control, %')+
   xlab('Day')+
-  scale_y_continuous(breaks=seq(0,300,by=50),limits=c(50,250))+
-  labs(color='Metformin, mM')+
-  geom_text(data=ODstars_day,aes(x=Day,y=ifelse(Metformin_mM=='0',240,250),label=as.character(pStars)),nudge_x = -0.5)+
-  geom_text(data=ODstars_treatment,aes(x=Day,label=as.character(pStars)),y=150,color='black')+
-  facet_grid(~Strain)
+  scale_y_continuous(breaks=seq(0,150,by=25),limits=c(75,160))+
+  geom_text(data=ODstars_day,aes(x=Day,y=ifelse(Metformin_mM=='0',160,155),label=as.character(pStars)),nudge_x = -0.5,size=5,show.legend = FALSE)+
+  geom_text(data=ODstars_treatment,aes(x=Day,label=as.character(pStars)),y=120,color='black',size=5,show.legend = FALSE)+
+  facet_grid(~Strain)+
+  theme(legend.position="top")
 
-
-dev.copy2pdf(device=cairo_pdf,
-             useDingbats=FALSE,
-             file=paste(odir,"/Growth_Summary_Prc_by_day_line.pdf",sep=''),
-             width=5,height=3)
+ggsave(file=paste0(odir,"/Growth_Summary_Prc_by_day_line.pdf"),
+             width=55,height=41,units='mm',scale=2,device=cairo_pdf,antialias="none",family="Arial")
 

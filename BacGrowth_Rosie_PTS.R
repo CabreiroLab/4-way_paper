@@ -8,20 +8,23 @@ library(PFun)
 
 
 
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
-theme_set(theme_Publication())
+
 
 
 cwd<-"~/Dropbox/Projects/Metformin_project/Bacterial Growth Assays/"
 setwd(cwd)
 
 
-odir<-'Summary_mutants'
+odir<-'Summary_PTS'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-#save.image('BGA_mutants.RData')
-#load('BGA_mutants.RData')
+#save.image('BGA_PTS.RData')
+#load('BGA_PTS.RData')
 
 
 strainlist<-c('OP50-C','OP50-MR','crp','crr','cyaA','mlc','cpdA','ptsG')
@@ -94,7 +97,7 @@ data_ts %>%
 
 Metcols <- colorRampPalette(c("red", "blue4"))(6)
 names(Metcols) <- levels(data_ts$Metformin_mM)
-Metlab<-'Metformin, mM'
+Metlab<-'Metformin,\nmM'
 
 ggplot(data_ts,aes(x=Time_h,y=OD,color=Metformin_mM))+
   geom_line(aes(group=interaction(Plate,Replicate,TReplicate,Metformin_mM)))+
@@ -116,7 +119,10 @@ datats.sum<-data_ts %>%
   summarise(OD_Mean=mean(OD),
             OD_SD=sd(OD))
 
-ggplot(datats.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
+
+datats.sum %>%
+  filter(!Strain %in% c("OP50-MR","mlc")) %>%
+  ggplot(aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   geom_line()+
   geom_ribbon(aes(ymin=OD_Mean-OD_SD,
                   ymax=OD_Mean+OD_SD),alpha=0.5,color=NA)+
@@ -125,12 +131,15 @@ ggplot(datats.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   scale_colour_manual(name = Metlab,values = Metcols)+
   scale_fill_manual(name = Metlab,values = Metcols)+
   scale_x_continuous(breaks=seq(0,18,by=6))+
-  facet_wrap(~Strain,ncol=4)
+  facet_wrap(~Strain,ncol=3)
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Growth_Summary_horizontal.pdf",sep=''),
-             useDingbats=FALSE,
-             width=6,height=3.5)
+ggsave(file=paste0(odir,"/Growth_Summary_horizontal.pdf"),
+             width=110,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+ggsave(file=paste0(odir,"/Growth_Summary_horizontal_tiny.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
 
 
 PlotBox<-function(data,yvar,ytitle,title) {
@@ -231,9 +240,12 @@ Straincols <- c("red4","blue4", terrain.colors(6))
 
 
 
-Straincols <- c("red","blue", viridis::viridis(6,option="inferno"))
-names(Straincols) <- strainlist
+Straincols <- c("red","blue", viridis::viridis(5,option="inferno"))
+names(Straincols) <- setdiff(strainlist,c("OP50-MR","mlc"))
 Strainlab<-"Strain"
+
+
+
 
 PlotComp<-function(data,stat,meas,measname) {
   stars<-stat %>%
@@ -260,34 +272,38 @@ PlotComp<-function(data,stat,meas,measname) {
     # scale_color_viridis(discrete=TRUE)+
     # scale_colour_brewer(palette="Set1")+
     # scale_fill_brewer(palette="Set1")+
-    ylab(paste0(measname," vs OP50-C Control, %") )+
+    ylab(paste0(measname," vs OP50-C, %") )+
     xlab("Metformin, mM")+
     geom_text(data=stars,
-              aes(label=pStars,y=40-as.numeric(Strain)*4 ),nudge_y = 120, show.legend = FALSE)
+              aes(label=pStars,y=40-as.numeric(Strain)*4 ),nudge_y = 120, show.legend = FALSE,size=5)
 }
 
 
 data.sum %>%
-  filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>% 
-  PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
+  filter(Normalisation=="Norm_CM" & Measure=="logAUC" & !Strain %in% c("OP50-MR","mlc")) %>% 
+  PlotComp(.,stat %>% filter(!Strain %in% c("OP50-MR","mlc")) ,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
 
 
+
+#Vs OP50-C
 Compplots<-data.sum %>%
-  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
+  filter(Normalisation=="Norm_CM" & Measure!="AUC"  & !Strain %in% c("OP50-MR","mlc")) %>%
   group_by(Measure) %>%
-  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) )
+  do(plot=PlotComp(.,stat %>% filter(!Strain %in% c("OP50-MR","mlc")),unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) )
 
 Compwrap<-data.sum %>%
-  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
+  filter(Normalisation=="Norm_CM" & Measure!="AUC"  & !Strain %in% c("OP50-MR","mlc")) %>%
   group_by(Measure) %>%
-  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain))
+  do(plot=PlotComp(.,stat %>% filter(!Strain %in% c("OP50-MR","mlc")),unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain))
 
  
+
+
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_SD.pdf"),
      Compplots$plot,
-     width=5,height=3, useDingbats=FALSE, ggsave)
+     width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial",ggsave)
 
 
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),"_SD.pdf"),
      Compwrap$plot,
-     width=9,height=6, useDingbats=FALSE, ggsave)
+     width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial", ggsave)

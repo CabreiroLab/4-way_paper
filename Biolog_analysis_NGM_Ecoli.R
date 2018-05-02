@@ -339,24 +339,6 @@ for (gr in c('C-Source','N-Source','P-Source','S-Source','Complete')){
 
 
 
-#KEGG info
-library(limma)
-
-library(org.EcK12.eg.db)
-library(pathview)
-
-#allpaths<-c('01110')
-
-
-
-
-path2pathde<-getKEGGPathwayNames('eco',remove.qualifier = TRUE)
-path2pathde$PathwayID<-gsub('path:','',path2pathde$PathwayID)
-allpaths<-gsub('eco','',path2pathde$PathwayID)
-
-write.csv(path2pathde,paste(odir,'/KEGG/KEGG_pathways.csv',sep=''))
-
-
 
 
 #Read KEGG enrichment results
@@ -385,75 +367,6 @@ ggplot(allqea.a,aes(x=Impact,y=logFDR,size=Ratio,color=Hits/`Total.Cmpd`))+
                   segment.alpha =segalpha)
 
 
-
-#KEGG mapping
-
-#Only unique values with preference for PM1 PM2A
-all.results.rcp<-subset(results.castfull,
-                        !Metabolite %in% c('Negative Control',"D,L-Malic Acid","beta-Methyl-D-Galactoside","O-Phospho-D-Tyrosine") &
-                          !KEGG_ID %in% c("") &
-                          !is.na(KEGG_ID) &
-                          !( Plate %in% c('PM3B','PM4A') & Metabolite %in% PM1PM2$Name ) &
-                          !( Plate %in% c('PM3B','PM4A') & KEGG_ID %in% PM1PM2$KEGG_ID ) & 
-                          !( Plate=='PM4A' & KEGG_ID=='C00097'))
-
-keggxml<-'~/Dropbox/Projects/2015-Metformin/Annotations/Ecoli/KEGG_pathways'
-
-pathcomp<-c('OP50Sens_T-OP50Sens_C_logFC')
-
-
-mapkey<-'KEGG_ID'
-nrow(all.results.rcp)
-gdata<-all.results.rcp
-#gdata<-all.results.rcp
-nrow(gdata)
-
-dupl<-duplicated(gdata[,mapkey])
-print('KEGG ID duplicates')
-print(table(dupl))
-gdataf<-gdata[!dupl,]
-rownames(gdataf)<-gdataf[,mapkey]
-
-print(paste('Total KEGG pathways to plot:',length(allpaths)))
-
-keggdir<-paste(cwd,odir,'/KEGG',sep='')
-dir.create(keggdir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
-setwd(keggdir)
-#comp.gr<-'Main'
-
-limitcpd<-3
-
-# pathcomp<-comp.list[[comp.gr]]
-# outsuffx<-comp.gr
-pv.out <- pathview(cpd.data = gdataf[,pathcomp,drop=FALSE],
-                   pathway.id = allpaths,
-                   cpd.idtype = "kegg",
-                   species = "eco",
-                   out.suffix = 'Complete',
-                   kegg.dir = keggxml,
-                   same.layer=FALSE,kegg.native = T,map.symbol=FALSE,
-                   map.null=FALSE,new.signature=FALSE, plot.col.key=TRUE,
-                   res=300,
-                   min.nnodes = 0,
-                   limit=list(gene=2,cpd=limitcpd),node.sum = "mean",
-                   low = list(gene = "blue", cpd = "blue"),
-                   mid=list(gene = "gray", cpd = "gray"),
-                   high = list(gene = "red", cpd ="red"))
-setwd(cwd)
-
-all.kegg.mappingst<-data.frame()
-paths<-names(pv.out)
-for (pth in paths) {
-  result<-pv.out[[pth]][['plot.data.cpd']]
-  result$PathwayID<-pth
-  all.kegg.mappingst<-rbind(all.kegg.mappingst,result)
-}
-all.kegg.mappingst$mol.col<-NULL
-
-all.kegg.mappings<-merge(path2pathde,all.kegg.mappingst,by='PathwayID',all.y=TRUE)
-
-
-write.csv(all.kegg.mappings,paste(odir,'/All_KEGG_mappings_Complete.csv',sep = ''),row.names = FALSE)
 
 
 

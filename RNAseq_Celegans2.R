@@ -404,6 +404,8 @@ logCPM <- cpm(d, log=TRUE, prior.count=1)
 #          '1','1','2','2')
 logCPMc <- removeBatchEffect(logCPM,as.character(pheno_data$Batch) )
 
+
+
 MDSdata<-plotMDS(logCPMc, col=as.numeric(d$samples$group),plot=TRUE)
 legend("bottomleft", as.character(unique(d$samples$group)), col=1:4, pch=1)
 

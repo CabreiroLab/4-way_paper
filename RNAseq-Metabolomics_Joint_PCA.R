@@ -3,7 +3,7 @@ library(tidyverse)
 
 
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
@@ -12,46 +12,11 @@ library(grid)
 library(gridExtra)
 
 
-library(ggthemes)
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
-
-theme_Publication <- function(base_size=14) {
-  
-  (theme_foundation(base_size=base_size)
-   + theme(plot.title = element_text(face = "bold",
-                                     size = rel(1.2), hjust = 0.5),
-           text = element_text(),
-           panel.background = element_rect(colour = NA),
-           plot.background = element_rect(colour = NA),
-           #panel.border = element_rect(colour = NA),
-           axis.title = element_text(face = "bold",size = rel(1)),
-           axis.title.y = element_text(angle=90,vjust =2),
-           axis.title.x = element_text(vjust = -0.2),
-           axis.text = element_text(), 
-           axis.line = element_line(colour="black"),
-           axis.ticks = element_line(),
-           panel.grid.major = element_line(colour="#f0f0f0"),
-           panel.grid.minor = element_blank(),
-           legend.key = element_rect(colour = NA),
-           #legend.position = "bottom",
-           #legend.direction = "horizontal",
-           #legend.key.size= unit(0.2, "cm"),
-           #legend.margin = unit(0, "cm"),
-           legend.title = element_text(face="italic"),
-           #plot.margin=unit(c(10,5,5,5),"mm"),
-           strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
-           strip.text = element_text(face="bold")
-   ))
-  
-}
-
-theme_set(theme_Publication())
-
-
-#theme_set(theme_light())
-
-# theme_update(panel.background = element_rect(colour = "black"),
-#              axis.text = element_text(colour = "black"))
 
 setwd("~/Dropbox/Projects/2015-Metformin/RNAseq")
 
@@ -61,6 +26,14 @@ setwd("~/Dropbox/Projects/2015-Metformin/RNAseq")
 
 odir<-'Summary_Celegans_Metf_DR'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+
+
+#STcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+STcols <- c("red3","steelblue")#colorRampPalette(c("red", "blue4"))(6)
+names(STcols) <- c("OP50-C","OP50-MR")
+STlab<-'Strain'
+
 
 
 
@@ -108,11 +81,13 @@ pcadata<-data.frame(File=dfiles,Dataset=tp) %>%
   select(datacols) %>%
   rbind(cel.RNAseq) %>%
   mutate(Dataset=factor(Dataset,levels=datasets),
-         PC1=ifelse(Dataset=='Amino acids',-PC1,PC1)) %>%
+         PC1=ifelse(Dataset=='Amino acids',-PC1,PC1),
+         Strain=recode(Strain,"OP50"="OP50-C")) %>%
   mutate_at(c('Strain','Group','Metformin_mM'),as.factor)
 
 
 
+pcadata$Strain
 
 glimpse(pcadata)
 
@@ -130,27 +105,29 @@ ellipses<-pcadata %>%
 
 PCAplot<-function(data,ellipses) {
   data %>%
-  ggplot(aes(x=PC1,y=PC2,colour=Strain))+
-    geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),linetype=Metformin_mM),size=1)+ 
-    geom_point(aes(fill=factor( ifelse(Metformin_mM==0,Strain, NA ) ) ),size=3,stroke=1,shape=21)+
+  ggplot(aes(x=PC1,y=PC2))+
+    geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),colour=Strain,linetype=Metformin_mM),size=1)+ 
+    geom_point(aes(fill= ifelse(Metformin_mM==0,as.character(Strain), NA ), colour=Strain ),size=3,stroke=1,shape=21)+
     scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
+    scale_fill_manual(name = STlab,values =STcols,na.value=NA,guide=FALSE)+
+    scale_color_manual(name = STlab,values =STcols)+
     scale_x_continuous(breaks=seq(-20,20,by=1))+
     scale_y_continuous(breaks=seq(-20,20,by=1))+
-    scale_fill_discrete(na.value=NA, guide="none")+
-    guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
+    guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour="black",fill=c(1,NA))))+
     theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank())+
     facet_grid(.~Dataset,scales = "free")+
     theme(legend.position="none")
 }
 
+# +
+#   theme(legend.position="none")
 
 aa.var<-cel.var %>%
   filter(Dataset=='Amino acids')
 
 fa.var<-cel.var %>%
   filter(Dataset=='Fatty acids')
-
 
 
 pcadata %>%
@@ -162,9 +139,6 @@ pcadata %>%
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Joint_PCA.pdf",sep=''),
              width=12,height=4, useDingbats=FALSE)
-
-
-
 
 
 RNAseq<-pcadata %>%
@@ -191,9 +165,18 @@ FA<-pcadata %>%
   scale_y_continuous(breaks=seq(-20,20,by=2))
 
 
+RNAseql<-RNAseq+
+  theme(legend.position="right")
 
-grid.arrange(RNAseq,AA,FA,ncol=3)
+ggsave(RNAseql,file=paste0(odir,"/RNAseq_PCA_legend.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Joint_PCA_withaxis.pdf",sep=''),
-             width=9,height=3, useDingbats=FALSE)
+
+
+pcas<-grid.arrange(RNAseq,AA,FA,ncol=3)
+pcas
+
+#
+
+ggsave(pcas,file=paste0(odir,"/Joint_PCA_withaxis.pdf"),
+             width=115,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")

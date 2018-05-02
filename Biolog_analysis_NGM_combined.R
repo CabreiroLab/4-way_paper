@@ -18,23 +18,28 @@ pole2<-function(x,y) {
   return(o) 
 }
 
-theme_set(theme_Publication())
+#theme_set(theme_Publication())
 #theme_set(theme_light())
+
+
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
+
 
 
 cwd<-"~/Dropbox/Projects/2015-Metformin/Biolog_Met_NGM/"
 setwd(cwd)
 
-#load('Biolog_combined.RData')
-#save.image('Biolog_combined.RData')
-
-
-remove(PlotEnrichment)
-remove(clustorder)
-
 
 odir<-'Summary'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
+
+
+#load('Biolog_combined.RData')
+#save.image('Biolog_combined.RData')
+
 
 
 info<-read_csv('../Biolog/Biolog_metabolites_EcoCyc_Unique_PM1-PM5.csv') %>%
@@ -147,12 +152,12 @@ results.cel<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv') %>%
          logFCrev=-logFC,
          PErev=-NE,
          NErev=-PE) %>%
-  select(Organism,Measure,Contrast,Contrast_type,Description,Plate,Well,Index,MetaboliteU,logFC=logFCrev,SE,PE=PErev,NE=NErev,FDR,logFDR)
+  select(Organism,Measure,Contrast,Contrast_type,Description,Plate,Well,Index,MetaboliteU,EcoCycID,KEGG_ID,logFC=logFCrev,SE,PE=PErev,NE=NErev,FDR,logFDR)
 
 
 results.ecocel<-results.eco %>%
   mutate(Organism='E. coli') %>%
-  select(Organism,Measure,Contrast,Contrast_type,Description,Plate,Well,Index,MetaboliteU,logFC,SE,PE,NE,FDR,logFDR) %>%
+  select(Organism,Measure,Contrast,Contrast_type,Description,Plate,Well,Index,MetaboliteU,EcoCycID,KEGG_ID,logFC,SE,PE,NE,FDR,logFDR) %>%
   rbind(results.cel) %>%
   filter(MetaboliteU %in% selmets$MetaboliteU) %>%
   mutate(MetaboliteU=factor(MetaboliteU,levels=metorder,labels=metorder),
@@ -168,9 +173,9 @@ results.ecocel<-results.eco %>%
 
 
 
-ecocelmulti2<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU"),2)
-ecocelmulti<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU"),3)
-ecocelmulti4<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU"),4)
+ecocelmulti2<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU","EcoCycID","KEGG_ID"),2)
+ecocelmulti<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU","EcoCycID","KEGG_ID"),3)
+ecocelmulti4<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU","EcoCycID","KEGG_ID"),4)
 
 
 
@@ -225,10 +230,8 @@ results.ecocel %>%
   facet_grid(~Organism)+
   theme( axis.text.y=element_blank())
 
-dev.copy2pdf(device=cairo_pdf,
-             useDingbats=FALSE,
-             file=paste(odir,"/EcoliCelegans_logFC_tall_Treatment_tiny.pdf",sep=''),
-             width=5,height=5)
+ggsave(file=paste0(odir,"/EcoliCelegans_logFC_tall_Treatment_tiny.pdf"),
+             width=60,height=60,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 
@@ -321,11 +324,11 @@ ecocelmulti %>%
   scale_colour_gradientn(colours = gradcols,
                          breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
   theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+        panel.grid.minor = element_blank(),
+        legend.position = "none")
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Scatter_Control-Treatment_Complete_Selmets.pdf",sep=''),
-             width=7,height=5, useDingbats=FALSE)
+ggsave(file=paste0(odir,"/Scatter_Control-Treatment_Complete_Selmets.pdf"),
+             width=70,height=70,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 #C elegans, E coli comparison - pole 
@@ -596,21 +599,28 @@ mlabels<-c('NGM','L-Arabinose','Acetoacetic Acid','Phosphono Acetic Acid')
 
 #Distributions
 
+Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+names(Metcols) <- c("Control","Treatment")
+Metlab<-'Metformin, mM'
+
+
 tsum %>%
   filter(Index %in% indxsel) %>%
   mutate( Metabolite=factor(Metabolite,levels=mlevels,labels=mlabels)) %>%
   ggplot(aes(x=Time_h,y=Mean,fill=Type,color=Type))+
   geom_ribbon(aes(ymin=Mean-SD,ymax=Mean+SD),color=NA,alpha=0.2)+
+  scale_colour_manual(name = Metlab,values =Metcols)+
+  scale_fill_manual(name = Metlab,values =Metcols)+
   geom_line()+
   scale_x_continuous(breaks=seq(0,24,by=6))+
   ylab("OD")+
   xlab("Time, h")+
   labs(fill="Type")+
-  facet_grid(~Metabolite)
+  facet_grid(~Metabolite)+
+  theme(legend.position = "none")
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Summary_Ecoli_growth_curves.pdf",sep=''),
-             width=9,height=3)
+ggsave(file=paste0(odir,"/Summary_Ecoli_growth_curves.pdf"),
+       width=80,height=26,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 
@@ -633,16 +643,17 @@ ggplot(res.sel,aes(color=Type))+
   geom_vline(aes(xintercept=Raw_Q90_Mean,color=Type))+
   geom_ribbon(data=data.Isel,aes(x=LogBrightness_num,ymin=(Mean-SD)*100,ymax=(Mean+SD)*100,fill=Type),alpha=0.5,color=NA)+
   geom_line(data=data.Isel,aes(x=LogBrightness_num,y=Mean*100,color=Type))+
-  #geom_point()+
-  ylab('Frequency, %')+
+  scale_colour_manual(name = Metlab,values =Metcols)+
+  scale_fill_manual(name = Metlab,values =Metcols)+
+  ylab('Probability density, %')+
   xlab('log2 Brightness')+
   scale_x_continuous(breaks=seq(-20,20,by=1))+
   coord_cartesian(ylim=c(0,15))+
-  facet_grid(.~Metabolite)
+  facet_grid(.~Metabolite)+
+  theme(legend.position = "none")
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Summary_Celegans_brightness_distribution.pdf",sep=''),
-             width=9,height=3)
+ggsave(file=paste(odir,"/Summary_Celegans_brightness_distribution.pdf",sep=''),
+             width=80,height=26,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 #Comparisons
@@ -710,22 +721,29 @@ res.comb<-res.sel %>%
   rbind(res.Ecsel) %>%
   mutate(Organism=factor(Organism,levels=c("E. coli","C. elegans")))
 
+
+Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+names(Metcols) <- c("0","50")
+Metlab<-'Metformin, mM'
+
+
 res.comb %>%
   ggplot(aes(x=Metabolite,y=logFC,color=Metformin_mM))+
   geom_hline(data=reflines,aes(yintercept=Ref),color='grey80',linetype='longdash')+
   scale_y_continuous(breaks=seq(-20,20,by=1))+
   geom_errorbar(aes(ymin=NE,ymax=PE),position = position_dodge(width = dwidth),width=0.25)+
-  geom_point(position = position_dodge(width = dwidth),size=2)+
+  scale_colour_manual(name = Metlab,values =Metcols)+
+  geom_point(position = position_dodge(width = dwidth),size=1)+
   labs(color="Metformin, mM")+
   #ylab('log2 AUC, OD*h')+
   theme(axis.text.x = element_text(angle = 90,hjust=1))+
-  facet_grid(Organism~.,scale="free_y")
+  facet_grid(Organism~.,scale="free_y")+
+  theme(legend.position = "top",
+        axis.text.x = element_text(angle = 45, hjust = 1))
 
 
-dev.copy2pdf(device=cairo_pdf,
-             useDingbats=FALSE,
-             file=paste(odir,"/Summary_CelegansEcoli_comparison.pdf",sep=''),
-             width=4,height=6)
+ggsave(file=paste0(odir,"/Summary_CelegansEcoli_comparison.pdf"),
+             width=30,height=60,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 
@@ -784,11 +802,10 @@ dev.copy2pdf(device=cairo_pdf,
 dev.off()#
 
 
-#EcoCyc enrichment
 
 
 
-
+#EcoCyc class enrichment
 
 ecli.co<-read_csv('../Biolog/Ecoli_All_class_instances_non_redundant.csv') %>%
   select(-X1)
@@ -838,7 +855,7 @@ ec.heatmap %>%
   
   
 
-#Some manual filtering
+#Some manual ordering
 EChm<-readxl::read_xlsx(paste0(odir,'/EcoCyc_enrichment_heatmap.xlsx'),sheet = 'Heatmap') %>%
   filter(is.na(Remove)) %>%
   mutate(Class=str_replace_all(as.character(Class),"\\|",""))
@@ -869,7 +886,6 @@ EcoCyc.enrichment %>%
 
 # groups<-c("Organism","Organism_short","Measure","Contrast","OMC")
 # features<-c("Class","Hierarchy","NoInstances","subclasses","supclasses")
-# 
 # 
 # results.ecocel %>%
 #   left_join(pmcs %>% select(Plate,Well,Instance)) %>%
@@ -932,7 +948,6 @@ class.enrichment %>%
 class.enrichment %>% 
   write_csv(paste0(odir,'/Metabolite_class_enrichment_nocarboxy_complete.csv'))
 
-
 class.enrichment %>%
   filter(OMC %in% c("Ec_G_T-C","Ce_F_T-C") & Type!="All") %>%
   group_by(Class) %>%
@@ -945,7 +960,221 @@ class.enrichment %>%
 
 
 
+#EcoCyc pathway enrichment
 
+#EcoCyc to Biolog links
+#Rocver possible links via classes
+pmcs2<-read_csv('../Biolog/EColi_net/All_Media_Mix_clean_explicit.csv') %>%
+  select(Plate,Well,EcoCycID=Instance)
+
+
+ecopats<-read_csv("~/Dropbox/Projects/2015-Metformin/Annotations/Ecoli/EcoCyc_pathways_metabolites_2018-04-04.csv") %>%
+  select(-X1,PID=`Pathway-ID`,Pathway=`Pathway-Name`,EcoCycID=Compounds,-Comment) %>%
+  separate_rows(EcoCycID,sep = ";")
+
+
+groups<-c("Organism","Measure","Contrast","Contrast_type","Description")
+
+
+results.ecocel %>%
+  filter(Contrast=="T-C") %>%
+  mutate(Up=logFC>0 & FDR <0.05,
+         Down=logFC<0 & FDR <0.05,
+         All=FDR<0.05) %>%
+  #gather different thresholds
+  gather(Type,Pass,Up,Down,All) %>%
+  group_by(Organism,OMC,Measure,Contrast,Contrast_type,Description,Type) %>%
+  summarise(Unique_size=n(),
+            Unique_pass=sum(Pass,na.rm = TRUE) ) 
+
+
+EcoCycenr<-results.ecocel %>%
+  filter(Contrast=="T-C" & Measure!="GR") %>%
+  select(-EcoCycID) %>%
+  left_join(pmcs2) %>%
+  left_join(ecopats) %>%
+  filter(!is.na(PID) & ! is.na(FDR)) %>%
+  group_by(Organism,OMC,Measure,Contrast,Contrast_type,Description) %>%
+  enrichment(c("PID","Pathway"),featureid="EcoCycID",enrtype="regular")
+
+
+#phyper(Class_pass-1,Total_pass,Total_size-Total_pass,Class_size,lower.tail=FALSE)
+
+EcoCycenr %>%
+  group_by(Organism,Measure,Contrast,Description,Type) %>%
+  summarise(Count=n())
+
+
+EcoCycenr %>%
+  filter(Measure %in% c("G","F") & Contrast=="T-C" & p.value<0.05) %>%
+  View
+
+# EcoCycenr %>%
+#   filter(Measure %in% c("G","F") & Contrast=="T-C" ) %>%
+#   write_csv(paste0(odir,"/EcoCyc_pathway_enrichment.csv"))
+
+
+
+#KEGG pathway enrichment
+#KEGG mapping
+
+#Only unique values with preference for PM1 PM2A
+
+#KEGG info
+library(limma)
+library(org.EcK12.eg.db)
+
+#allpaths<-c('01110')
+
+
+path2pathde<-getKEGGPathwayNames('eco',remove.qualifier = TRUE)
+path2pathde$PathwayID<-gsub('path:','',path2pathde$PathwayID)
+
+allpaths<-gsub('eco','',path2pathde$PathwayID)
+
+write.csv(path2pathde,paste(odir,'/KEGG_pathways.csv',sep=''))
+
+
+
+keggprep<-ecocelmulti2 %>%
+  filter(x_OMC=="Ec_G_T-C" & y_OMC=="Ce_F_T-C") %>%
+  filter(!KEGG_ID %in% c("") &
+           !is.na(KEGG_ID)&  !( Plate=='PM4A' & KEGG_ID=='C00097')) %>%
+  data.frame
+
+
+
+mapkey<-'KEGG_ID'
+nrow(keggprep)
+gdata<-keggprep
+#gdata<-all.results.rcp
+nrow(gdata)
+
+dupl<-duplicated(gdata[,"KEGG_ID"])
+print('KEGG ID duplicates')
+print(table(dupl))
+gdataf<-gdata[!dupl,]
+
+rownames(gdataf)<-gdataf[,"KEGG_ID"]
+
+
+
+
+# allpaths<-read_csv(paste0(odir,'/KEGG_pathways.csv')) %>%
+#   pull(PathwayID) %>%
+#   unique
+
+print(paste('Total KEGG pathways to plot:',length(allpaths)))
+
+
+#comp.gr<-'Main'
+
+library(pathview)
+
+
+
+pathcomp<-c('x_logFC',"y_logFC")
+keggxml<-'~/Dropbox/Projects/2015-Metformin/Annotations/Ecoli/KEGG_pathways'
+
+
+keggdir<-paste(cwd,odir,'/KEGG',sep='')
+dir.create(keggdir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
+setwd(keggdir)
+
+limitcpd<- 2
+
+pv.out <- pathview::pathview(cpd.data = gdataf[,pathcomp,drop=FALSE],
+                   pathway.id = allpaths,
+                   cpd.idtype = "kegg",
+                   species = "eco",
+                   out.suffix = 'Ecoli_Celegans',
+                   kegg.dir = keggxml,
+                   same.layer=FALSE,kegg.native = T,map.symbol=FALSE,
+                   map.null=FALSE,new.signature=FALSE, plot.col.key=TRUE,
+                   res=300,
+                   min.nnodes = 0,
+                   limit=list(gene=2,cpd=limitcpd),node.sum = "mean",
+                   low = list(gene = "blue", cpd = "blue"),
+                   mid=list(gene = "gray", cpd = "gray"),
+                   high = list(gene = "red", cpd ="red"))
+setwd(cwd)
+
+names(pv.out)
+
+detach("package:pathview", unload=TRUE)
+detach("package:limma", unload=TRUE)
+detach("package:org.EcK12.eg.db", unload=TRUE)
+
+
+
+extractpat<-function(pat,pv.out){
+  frame<-data.frame(pv.out[[pat]][['plot.data.cpd']]) 
+  if ("all.mapped" %in% colnames(frame)) {
+    frame<-frame%>%
+      unnest(all.mapped) %>%
+      unnest(type) %>%
+      unnest(kegg.names) %>%
+      filter(!all.mapped %in% c("",NA) ) 
+    return(frame)
+  } else {
+    return(data.frame(NA))
+  }
+}
+
+all.kegg.mappings<-path2pathde %>%
+  left_join( data.frame(PathwayID=names(pv.out)) ) %>%
+  group_by(PathwayID,Description) %>%
+  do( extractpat(as.character(.$PathwayID),pv.out)  )
+  
+
+write.csv(all.kegg.mappings,paste(odir,'/All_KEGG_mappings_Complete.csv',sep = ''),row.names = FALSE)
+
+#all.kegg.mappings<-read_csv(paste0(odir,"/All_KEGG_mappings_Complete.csv"))
+  
+KEGGmets<-all.kegg.mappings %>%
+  filter(all.mapped!="") %>%
+  group_by(PathwayID,Description,all.mapped) %>%
+  summarise %>%
+  rename(KEGG_ID=all.mapped,Pathway=Description)
+
+
+KEGGgroups<-c("PathwayID","Pathway")
+
+KEGGenrich<-results.ecocel %>%
+  separate_rows(KEGG_ID,sep=",") %>%
+  left_join(KEGGmets) %>%
+  filter(!is.na(KEGG_ID) & !is.na(PathwayID) & !is.na(FDR) & !PathwayID %in% c("eco01502","eco00521")) %>%
+  group_by(Organism,OMC,Measure,Contrast,Contrast_type,Description) %>%
+  enrichment(KEGGgroups,"KEGG_ID",enrtype="regular")
+
+
+KEGGenrich %>%
+  filter(Contrast=="T-C" & Measure %in% c("G","F")) %>%
+  filter(FDR<0.05) %>%
+  View
+
+KEGGenrich %>%
+  filter(Contrast=="T-C" & Type %in% c("Up","Down") & Measure %in% c("G","F")) %>%
+  group_by(PathwayID) %>%
+  filter( any(FDR<0.05)) %>%
+  ungroup %>%
+  clustorder('Pathway',c("Organism","Type"),'logFDR',descending=TRUE) %>%
+  PlotEnrichment("Type","Pathway",fillval = "logFDRbin")+
+  facet_grid(.~Organism)+
+  ylab("KEGG pathway")+
+  labs(fill="FDR")+
+  theme(axis.text.x = element_text(angle=45))
+
+
+ggsave(file=paste(odir,'/Enrichment_heatmap_KEGG.pdf',sep = ''),
+       width=85,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+KEGGenrich %>%
+  filter(Measure %in% c("G","F") & Contrast=="T-C" ) %>%
+  write_csv(paste0(odir,"/KEGG_pathway_enrichment.csv"))
 
 
 

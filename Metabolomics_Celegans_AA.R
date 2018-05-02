@@ -8,16 +8,17 @@ library(RColorBrewer)
 library(ComplexHeatmap)
 library(circlize)
 
-library(ggthemes)
 
 #devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
 
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
-
-theme_set(theme_Publication())
 
 
 setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
@@ -55,102 +56,132 @@ met<-read_xlsx('Metformin AA worm data.xlsx',sheet='Complete_table') %>%
   mutate(ConcNorm=Conc/(SampleMean/mean(SampleMean,na.rm=TRUE)),
          Metabolite=str_trim(Metabolite),
          logConc=log2(ConcNorm),
-         Strain=factor(Strain,levels=strains)) %>%
+         Strain=factor(Strain,levels=strains),
+         Metformin_mM=Drug_mM) %>%
   group_by(Group,Metabolite) %>%
   mutate(logConc_group=mean(logConc)) %>%
   ungroup %>%
   mutate(logConc_fill=ifelse( Conc==0, logConc_group,logConc)) %>%
-  mutate_at(c('ID','Sample','Name','Drug_mM','Group','Replicate','Metabolite','Metabolite_short'),as.factor) %>%
+  mutate_at(c('ID','Sample','Name','Drug_mM','Metformin_mM','Group','Replicate','Metabolite','Metabolite_short'),as.factor) %>%
   select(ID:Metabolite,Metabolite_short,everything())
 
 
 met %>%
   write_csv(paste0(odir,"/Raw_data.csv"))
 
-# met %>%
-#   filter(is.na(Conc)) %>%
-#   View()
+
+PCAplot<-function(pcadata,ellipses,PC1prc,PC2prc){
+  ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
+    xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
+    ylab(paste('PC2 - ',PC2prc,'% of variance',sep=''))+
+    geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),linetype=Metformin_mM),size=1)+ 
+    geom_point(aes(fill=factor( ifelse(Metformin_mM==0,Strain, NA ) ) ),size=5,stroke=1,shape=21)+
+    scale_linetype_manual("Metformin,\nmM",values=c("0"=1,"50"=2))+
+    scale_fill_discrete(na.value=NA, guide="none")+
+    guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())+
+    facet_grid(.~Dataset)
+}
+
+
 
 metinfo<-met %>%
-  group_by(Sample,Group,Strain,Drug_mM,Replicate) %>%
+  group_by(Sample,Group,Strain,Metformin_mM) %>%
   summarise %>%
   data.frame
-
 rownames(metinfo)<-metinfo$Sample
 
 
-metslm<-met %>%
-  filter(Strain %in%  c('OP50','OP50-MR')) %>%
-  select(Sample,Metabolite,logConc_fill) %>%
-  spread(Metabolite,logConc_fill) %>%
-  data.frame
+PCAres<-met %>%
+  filter(Strain %in%  c('OP50','OP50-crp')) %>%
+  PCAprep("Sample","Metabolite","logConc_fill",metinfo)
 
 
 
+ellipses<-PCAres$Ellipses
+pcadata<-PCAres$pcadata
+PC1prc<-PCAres$PC1prc
+PC2prc<-PCAres$PC2prc
 
-rownames(metslm)<-metslm$Sample
-head(metslm)
-
-
-pca.dat<-metslm %>%
-  select(-Sample)
-
-
-#Find compounds with missing values
-miss.cols<-apply(pca.dat, 2, function(x) any(is.na(x)))
-miss.rows<-apply(pca.dat, 1, function(x) any(is.na(x)))
-
-missing.cols<-names(miss.cols[miss.cols==TRUE])
-missing.rows<-rownames(metslm)[miss.rows==TRUE]
-
-missing.cols
-missing.rows
-
-
-cleancols<-setdiff(colnames(pca.dat),missing.cols)
-
-pca.dat<-pca.dat[,cleancols]
-
-
-ir.pca <- prcomp(pca.dat,
-                 center = TRUE,
-                 scale. = TRUE)
-
-
-plot(ir.pca,type='l')
-
-
-pcadata<-data.frame(ir.pca$x) %>%
-  rownames_to_column('Sample') %>%
-  left_join(metinfo)
-
-
-pcaresult<-summary(ir.pca)$importance
-PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
-PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
 
 # write.csv(pcadata,paste(odir,'/PCA_data_OP50_OP50-MR.csv',sep=''))
 # write.csv(pcaresult,paste(odir,'/PCA_variance_OP50_OP50-MR.csv',sep=''))
 
-ellipses<-pcadata %>%
-  group_by(Strain,Group,Drug_mM) %>%
-  do(getellipse(.$PC1,.$PC2,1))
+ellipses<-PCAres$Ellipses %>%
+  mutate(Dataset="Amino acids")
 
-ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
-  xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
-  ylab(paste('PC2 - ',PC2prc,'% of variance',sep=''))+
-  geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),linetype=Drug_mM),size=1)+ 
-  geom_point(aes(fill=factor( ifelse(Drug_mM==0,Strain, NA ) ) ),size=5,stroke=1,shape=21)+
-  scale_linetype_manual("Drug, mM",values=c("0"=1,"50"=2))+
-  scale_fill_discrete(na.value=NA, guide="none")+
-  guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
+pcadata<-PCAres$pcadata %>%
+  mutate(Dataset="Amino acids")
 
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste0(odir,"/PCA_OP50_OP50-MR.pdf"),
-             width=12,height=9)
+pcadata %>%
+  PCAplot(ellipses,PC1prc,PC2prc)
+
+ggsave(file=paste0(odir,"/PCA_OP50_OP50-crp_AA.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+#Joint PCA Fig5
+
+
+metFA<-read_csv('Summary_Celegans_FA/Raw_data.csv')
+
+metFAinfo<-metFA %>%
+  group_by(Sample,Group,Strain,Metformin_mM) %>%
+  summarise %>%
+  mutate_all(as.factor) %>%
+  data.frame
+rownames(metFAinfo)<-metFAinfo$Sample
+
+
+PCAresFA<-metFA %>%
+  filter(Strain %in%  c('OP50','OP50-crp')) %>%
+  PCAprep("Sample","Metabolite","logConc_fill",metFAinfo)
+
+
+ellipsesFA<-PCAresFA$Ellipses %>%
+  mutate(Dataset="Fatty acids")
+
+pcadataFA<-PCAresFA$pcadata %>%
+  mutate(Dataset="Fatty acids")
+
+
+PC1prcFA<-PCAresFA$PC1prc
+PC2prcFA<-PCAresFA$PC2prc
+
+
+
+pcadataFA %>%
+  PCAplot(ellipsesFA,PC1prcFA,PC2prcFA)
+
+ggsave(file=paste0(odir,"/PCA_OP50_OP50-crp_FA.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+AA<-pcadata %>%
+  PCAplot(ellipses,PC1prc,PC2prc) +
+  theme(legend.position = "none")
+
+
+FA<-pcadataFA %>%
+  PCAplot(ellipsesFA,PC1prcFA,PC2prcFA)+
+  theme(legend.position = "none")
+
+pcas<-gridExtra::grid.arrange(AA,FA,ncol=2)
+pcas
+
+#
+ggsave(pcas,file=paste0(odir,"/Joint_PCA_Fig5.pdf"),
+       width=95,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
+
+
+
 
 
 #cleanmets<-setdiff(allmets,missing.cols)
@@ -174,7 +205,7 @@ heatshape$Metabolite<-NULL
 
 #Order anotation by heatmap colnames
 hanot<-metinfo[colnames(heatshape),] %>%
-  select(Strain,Metformin_mM=Drug_mM)
+  select(Strain,Metformin_mM=Metformin_mM)
 
 ha<-HeatmapAnnotation(df=hanot, col = list(Metformin_mM=c('50'='black','0'='white')))
 
@@ -470,16 +501,10 @@ comparisons<-c("Treatment effect on OP50","Treatment effect on OP50-MR","Treatme
 
 fig2conts<-c('C_T-C_C','MR_T-MR_C','nhr49_T-nhr49_C','MR_C-C_C','nhr49_C-C_C')
 
+fig6conts<-c('C_T-C_C','crp_T-crp_C')
 
 
-fig6conts<-c('C_T-C_C','MR_T-MR_C','crp_T-crp_C')
-fig6desc<-
-
-fig6desc
-
-
-
-contsel<-fig2conts
+contsel<-fig6conts
 descsel<-contrasts.desc[contrasts.desc$Contrast %in% contsel,"Description"] %>% as.character
 
 
@@ -500,7 +525,8 @@ ordmet<-rownames(heatsum[h$order,])
 
 
 
-amp<-4
+
+amp<-2
 
 minv<- -amp
 maxv<- amp
@@ -529,17 +555,8 @@ results.joint %>%
   #scale_fill_gradient2(low = "purple", mid = "gray", high = "red", midpoint = 0, breaks = clrbrks)+
   xlab("Comparison")+
   ylab('Metabolite')+
-  theme(axis.ticks=element_blank(),
-        panel.border=element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-        axis.line = element_line(colour = NA),
-        axis.line.x = element_line(colour = NA),
-        axis.line.y = element_line(colour = NA),
-        strip.text = element_text(colour = 'black', face='bold',size=10),
-        axis.text.x= element_text(face='bold', colour='black', size=10, angle = 90, hjust = 1))+
+  theme_Heatmap()+
   facet_grid(Type~.,space='free_y',scale='free_y')
-
 
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig2_combined.pdf',sep = ''),
@@ -549,55 +566,27 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig2_combined
 
 
 
-
-amp<-3
-
-minv<- -amp
-maxv<- amp
-
-nstep<-(maxv-minv)*2
-
-clrbrks<-seq(-amp,amp,by=1)
-
-brks<-seq(minv,maxv,by=(maxv-minv)/(nstep))
-bgg <- colorRampPalette(c("blue", "gray90", "red"))(n = nstep)
-
-clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
-
-
-
 results.joint %>%
   filter(Contrast %in% contsel) %>%
   group_by(Metabolite) %>%
   filter(any(FDR<0.05)) %>%
   ungroup %>%
   mutate(Description=factor(Description,levels=rev(descsel) )) %>%
-  #mutate(Description=factor(Metabolite,levels=ordmet)) %>%
   ggplot(aes(x=Metabolite,y=Description))+
   geom_tile(aes(fill=logFC))+
-  #geom_point(aes(size=FDRc,colour=logFC),alpha=0.9)+
-  geom_text(aes(label=as.character(FDRStars)),angle = 90)+
-  #scale_size_discrete(range = c(2,4))+#,breaks=brks
+  geom_text(aes(label=as.character(FDRStars)),angle = 90,size=5,vjust=0.75)+
   scale_fill_gradientn(colours = clrscale,
                        breaks=clrbrks,limits=c(-amp,amp))+
-  #scale_fill_gradient2(low = "purple", mid = "gray", high = "red", midpoint = 0, breaks = clrbrks)+
   xlab("Metabolite")+
   ylab('Comparison')+
-  theme(axis.ticks=element_blank(),
-        panel.border=element_blank(),
-        panel.grid.minor = element_blank(),
-        panel.grid.major = element_blank(),
-        axis.line = element_line(colour = NA),
-        axis.line.x = element_line(colour = NA),
-        axis.line.y = element_line(colour = NA),
-        strip.text = element_text(colour = 'black', face='bold',size=10),
-        axis.text.x= element_text(face='bold', colour='black', size=10, angle = 90, hjust = 1))+
+  theme_Heatmap()+
+  theme(axis.text.x =  element_text(angle = 45, hjust = 1))+
   facet_grid(.~Type,space='free_x',scale='free_x')
 
 
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig2_combined_horizontal.pdf',sep = ''),
-             width=10,height=4,useDingbats=FALSE)
+ggsave(file=paste0(odir,'/Comparison_heatmap_Fig6_combined_horizontal.pdf'),
+       width=180,height=45,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 

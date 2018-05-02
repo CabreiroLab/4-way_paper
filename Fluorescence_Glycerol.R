@@ -3,7 +3,6 @@ library(tidyverse)
 #devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-
 setwd("~/Dropbox/Projects/Metformin_project/Fluorescence microscopy/")
 
 
@@ -14,56 +13,30 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 #load("Fluorescence_Glycerol.RData")
 #save.image('Fluorescence_Glycerol.RData')
 
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
-theme_set(theme_light())
+Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+names(Metcols) <- levels(data_ts$Metformin_mM)
+Metlab<-'Metformin,\nmM'
 
-library(ggthemes)
-
-theme_Publication <- function(base_size=14) {
-  
-  (theme_foundation(base_size=base_size)
-   + theme(plot.title = element_text(face = "bold",
-                                     size = rel(1.2), hjust = 0.5),
-           text = element_text(),
-           panel.background = element_rect(colour = NA),
-           plot.background = element_rect(colour = NA),
-           #panel.border = element_rect(colour = NA),
-           axis.title = element_text(face = "bold",size = rel(1)),
-           axis.title.y = element_text(angle=90,vjust =2),
-           axis.title.x = element_text(vjust = -0.2),
-           axis.text = element_text(), 
-           axis.line = element_line(colour="black"),
-           axis.ticks = element_line(),
-           panel.grid.major = element_line(colour="#f0f0f0"),
-           panel.grid.minor = element_blank(),
-           legend.key = element_rect(colour = NA),
-           #legend.position = "bottom",
-           #legend.direction = "horizontal",
-           #legend.key.size= unit(0.2, "cm"),
-           #legend.margin = unit(0, "cm"),
-           #legend.title = element_text(face="italic"),
-           #plot.margin=unit(c(10,5,5,5),"mm"),
-           strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
-           strip.text = element_text(face="bold")
-   ))
-  
-}
-
-theme_set(theme_Publication())
-
+Slevels<-c('OP50-C','OP50-C-Gly','glpK','glpK-Gly')
+Slabels<-c('OP50-C','OP50-C+Glyc','dglpK','dglpK+Glyc')
+strains<-c('OP50-C','glpK')
 
 data <- read_csv('All_raw_data.csv') %>%
   filter(Type %in% c('Glycerol')) %>%
   mutate_at(c('Type','Gene','Strain','Metformin_mM','Supplement','SGroup','Condition','ID','Replicate'),as.factor) %>%
-  mutate(SGroup=factor(SGroup,levels=c('OP50','OP50-MR','crp','cra','glpK','OP50-Glu','OP50-Gly','glpK-Gly')),
-         Strain=factor(Strain,levels=c('OP50','glpK')),
+  mutate(SGroup=factor(SGroup,levels=Slevels,labels=Slabels),
+         Strain=factor(Strain,levels=strains),
          Supplement=factor(Supplement,levels=c('None','Glycerol'),labels=c('','+ Glycerol') ))
-
 
 
 data %>%
   filter(Measure=='Log') %>%
-  group_by(Type,Gene,Replicate,Strain,Supplement,Metformin_mM) %>%
+  group_by(Type,Gene,Replicate,SGroup,Strain,Supplement,Metformin_mM) %>%
   summarise(Count=n()) %>%
   View()
   
@@ -83,6 +56,7 @@ plotBox<-function(data,yval,ylb){
     ylab(ylb)+
     xlab('Bacterial strain + Supplement')+
     theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+    scale_colour_manual(name = Metlab,values =Metcols)+
     facet_grid(Gene~Type+Replicate,scale="free_y")
 }
 
@@ -95,6 +69,7 @@ plotBoxC<-function(data,yval,ylb){
     ylab(ylb)+
     xlab('Bacterial strain + Supplement')+
     theme(axis.text.x = element_text(angle = 90, hjust = 1))+
+    scale_colour_manual(name = Metlab,values =Metcols)+
     facet_grid(Gene~.,scale="free_y")
 }
 
@@ -140,7 +115,8 @@ data %>%
   labs(color='Metformin, mM')+
   scale_y_continuous(breaks=seq(-10,10,by=1))+
   theme(axis.text.x = element_text(angle = 90, hjust = 1))+
-  facet_grid(~Gene,scale="free_y")
+  scale_colour_manual(name = Metlab,values =Metcols)+
+  facet_wrap(~Gene,scale="free_y")
 
 
 dev.copy2pdf(device=cairo_pdf,
@@ -185,11 +161,12 @@ dev.copy2pdf(device=cairo_pdf,
 #Linear modelling
 
 
-contrasts<-read.contrasts2('!Contrasts_fluorescence.xlsx')
+contrasts<-read.contrasts('!Contrasts_fluorescence.xlsx')
 
 contrasts$Contrasts.table
 contrasts.desc<-contrasts$Contrasts.table%>%
-  select(Description:Supplement)
+  select(Description:Metformin_mM) %>%
+  mutate(SGroup=factor(SGroup,levels=Slevels,labels=Slabels))
 
 
 contr.matrix<-contrasts$Contrasts.matrix
@@ -198,7 +175,7 @@ contr.matrix
 results.all<-data %>%
   filter(Measure=='Log') %>%
   group_by(Gene) %>%
-  do(hypothesise2(.,"Norm~0+ID",contr.matrix)) %>%
+  do(hypothesise(.,"Norm~0+ID",contr.matrix)) %>%
   getresults(contrasts.desc)
 
 
@@ -210,7 +187,6 @@ results.multi<-results.all$multi
 head(results.castfull)
 head(results.cast)
 
-View(results)
 
 write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/All_results_sidebyside.csv',sep=''),row.names = FALSE)
@@ -288,12 +264,52 @@ genes<-unique(as.character(results$Gene))
 
 
 
+showstats<-results %>%
+  filter(Contrast %in% c('OP50_T',"glpK_T","OP50Gly_T","glpKGly_T","OP50Gly_I","gklpKGly_I"))
 
 
+data %>%
+  filter(Measure=='Log') %>%
+  group_by(Gene,Strain,SGroup) %>%
+  summarise(ymin=min(NormAbs),
+            ymax=max(NormAbs),
+            logymin=log2(ymin),
+            logymax=log2(ymax))
+
+blank_data <- data %>%
+  filter(Measure=='Log') %>%
+  group_by(Gene,Strain,SGroup) %>%
+  summarise(NormAbs=2^(min(Norm)+(max(Norm)-min(Norm))*1.3 ) )%>% #ymin+2^( log2( max(NormAbs)/ymin )*1.5 )  #ymin+(max(NormAbs)-ymin)*1.5
+  mutate(Metformin_mM="0",
+         Metformin_mM=factor(Metformin_mM,levels=c("0","50"),labels=c("0",'50')))
+
+hj<-0.8
+vj<-2
+nx<--0.5
+
+quartz()
+data %>%
+  filter(Measure=='Log') %>%
+  ggplot+
+  aes(x=SGroup,y=NormAbs,color=Metformin_mM)+
+  geom_jitter(aes(fill=Metformin_mM),width=0.25,size=1,alpha=0.5)+
+  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity",alpha=0.5) +
+  geom_blank(data = blank_data,aes(x=SGroup,y=NormAbs))+
+  scale_y_continuous(trans = 'log2',
+                     breaks = scales::trans_breaks('log2', function(x) 2^x),
+                     labels = scales::trans_format('log2', scales::math_format(2^.x))) + 
+  scale_colour_manual(name = "Metformin, mM",values =Metcols)+
+  scale_fill_manual(name = "Metformin, mM",values =Metcols)+
+  geom_text(data=showstats %>% filter(Contrast_type=="Treatment"),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
+  geom_text(data=showstats %>% filter(Contrast_type=="Interaction"),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,color="red",nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)+
+  ylab('Mean fluorescence per worm, a.u.')+
+  xlab('Strain & Supplement')+
+  theme(legend.position="top",
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  facet_wrap(~Gene,scale = "free_y",ncol=3)
 
 
-
-
-
+ggsave(file=paste(odir,'/Fluorescence_logScale2.pdf',sep = ''),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 

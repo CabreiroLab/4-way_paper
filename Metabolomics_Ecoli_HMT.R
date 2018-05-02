@@ -1,8 +1,6 @@
 #Data transformation and analysis
-
 library(tidyverse)
 library(readxl)
-
 
 library(ggrepel)
 library(RColorBrewer)
@@ -10,46 +8,39 @@ library(RColorBrewer)
 # library(ComplexHeatmap)
 # library(circlize)
 
-library(ggthemes)
-
 
 #devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 
-theme_set(theme_Publication())
-
-#theme_set(theme_light())
-# theme_update(panel.background = element_rect(colour = "black"),
-#              axis.text = element_text(colour = "black"))
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
+cwd<-"~/Dropbox/Projects/2015-Metformin/Metabolomics/"
+setwd(cwd)
 
-setwd("~/Dropbox/Projects/2015-Metformin/Metabolomics/")
+
 
 #load('Metabolomics_Ecoli_HMT.RData')
 #save.image('Metabolomics_Ecoli_HMT.RData')
 
+
+
+
 odir<-'Summary_Ecoli_HMT'
+odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
+
+
+
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
-
-
-# 
-# .simpleCap <- function(x) {
-#   s <- strsplit(x, " ")[[1]]
-#   paste(toupper(substring(s, 1, 1)), substring(s, 2),
-#         sep = "", collapse = " ")
-# }
-
 
 
 
 met.raw<-read_xlsx('HMT_Ecoli_complete/Raw_data.xlsx',sheet='Raw')
 
-
 met.info<-read_xlsx('HMT_Ecoli_complete/Raw_data.xlsx',sheet='Samples')
-
-
 
 met.TCA<-read_xlsx('HMT_Ecoli_complete/Raw_data.xlsx',sheet='TCA')
 
@@ -104,10 +95,10 @@ grporder<-c("C_0_N","C_50_N",
             "CRP_0_N","CRP_50_N",
             "C_0_I50","oeCRP_0_I50","oeCRP_0_I100")
 
-strn.order<-c('OP50','CRP','oeCRP')
+strn.order<-c('OP50-C','crp','oecrp')
 spl.order<-c('None','Glucose','IPTG50','IPTG100')
 
-sgrp.order<-c('OP50 None','OP50 Glucose','CRP None','OP50 IPTG50','oeCRP IPTG50','oeCRP IPTG100')
+sgrp.order<-c('OP50-C','OP50-C + Glucose','crp','OP50-C + IPTG50','oecrp + IPTG50','oecrp + IPTG100')
 
 met.all<-met.raw %>%
   rename(Metabolite=`Pathway Label`,
@@ -117,11 +108,12 @@ met.all<-met.raw %>%
   gather(Sample_ID,Conc,`OP50-1-C`:`CRP-OE-3-100`) %>%
   left_join(met.info) %>%
   left_join(met.TCAp,by=c('Sample_ID','Metabolite')) %>%
-  mutate(Conc=as.numeric(Conc),
+  mutate(Strain=recode(Strain,"OP50"="OP50-C","CRP"="crp","oeCRP"="oecrp"),
+         Conc=as.numeric(Conc),
          Conc=ifelse(is.na(Conc) & !is.na(Prediction),Prediction,Conc),
          Conc_log=log2(Conc),
          Metformin_mM=as.factor(Metformin_mM),
-         SGroup=paste(Strain,Supplement),
+         SGroup=ifelse(Supplement!="None",paste(Strain,Supplement,sep=" + "),Strain),
          SGroup=factor(SGroup,levels=sgrp.order,labels=sgrp.order),
          Group=factor(Group,levels=grporder,labels=grporder),
          Strain=factor(Strain,levels=strn.order,labels=strn.order),
@@ -131,6 +123,12 @@ met.all<-met.raw %>%
 head(met.all)
 
 
+met.all %>%
+  filter(is.na(SGroup))
+
+unique(met.all$SGroup)
+
+met.all$Strain
 
 #grepl('CoA',Metabolite)
 
@@ -234,11 +232,11 @@ PCAplot<-function(PCAres) {
     xlab(paste('PC1 - ',PCAres$PC1prc,'% of variance',sep=''))+
     ylab(paste('PC2 - ',PCAres$PC2prc,'% of variance',sep=''))+
     geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),linetype=Metformin_mM),size=1)+ 
-    geom_point(aes(fill=factor( ifelse(Metformin_mM==0,SGroup, NA ) ) ),size=5,stroke=1,shape=21)+
-    scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
+    geom_point(aes(fill=factor( ifelse(Metformin_mM==0,SGroup, NA ) ) ),size=2,stroke=1,shape=21)+
+    scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=3))+
     scale_fill_discrete(na.value=NA, guide="none")+
     guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
-    geom_text_repel(aes(label=ID),size=2,color='black')+
+    #geom_text_repel(aes(label=ID),size=2,color='black')+
     labs(colour='Strain & Supplement')+
     theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank())
@@ -257,18 +255,17 @@ metcomplete %>%
   PCAplot
 
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_All_HMT_linear_scale.pdf",sep=''),
-             width=12,height=9)
+ggsave(file=paste0(odir,"/PCA_All_HMT_linear_scale.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
 
 #Vanilla filled - All
 metcomplete %>%
   PCAprep('ID','Metabolite','Filled_conc_log',bioinfo) %>%
   PCAplot
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_All.pdf",sep=''),
-             width=12,height=9)
+ggsave(file=paste0(odir,"/PCA_All.pdf"),
+             width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 
@@ -279,9 +276,8 @@ metcomplete %>%
   PCAplot
 
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_noIPTG_oe.pdf",sep=''),
-             width=12,height=9)
+ggsave(file=paste(odir,"/PCA_noIPTG_oe.pdf",sep=''),
+             width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 #Control, IPTG, oe filled
@@ -290,20 +286,21 @@ metcomplete %>%
   PCAprep('ID','Metabolite','Filled_conc_log',bioinfo) %>%
   PCAplot
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_IPTG_oe.pdf",sep=''),
-             width=12,height=9)
+ggsave(file=paste(odir,"/PCA_IPTG_oe.pdf",sep=''),
+             width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
 
 #No Glucose
 metcomplete %>%
   filter(!Supplement=='Glucose') %>%
   PCAprep('ID','Metabolite','Filled_conc_log',bioinfo) %>%
-  PCAplot
+  PCAplot+
+  labs(color="Condition")
 
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_NoGlucose.pdf",sep=''),
-             width=12,height=9)
+ggsave(file=paste(odir,"/PCA_NoGlucose.pdf",sep=''),
+             width=70,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 #What Filipe asked
@@ -326,7 +323,7 @@ heatcomplete<-met.sel %>%
 
 
 cols<-list(Metformin_mM = c('0' = "white", '50' = "Black"),
-           Strain=c("OP50"="red3","CRP"="blue","oeCRP"="purple"),
+           Strain=c("OP50-C"="red3","crp"="blue","oecrp"="purple"),
            Supplement=c("None"="white","Glucose"="green2","IPTG50"="turquoise","IPTG100"="turquoise3") )
            
 hinfo<-bioinfo %>%
@@ -336,9 +333,9 @@ hinfo<-bioinfo %>%
 heatcomplete %>%
   HMap('ID','Metabolite','Conc_log',hinfo,cols=cols)
 
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Heatmap_All.pdf",sep=''),
-             width=17,height=12, useDingbats=FALSE)
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,"/Heatmap_All.pdf",sep=''),
+             width=12,height=8)
+
 
 #Heatmap - No Glucose
 heatcomplete %>%
@@ -382,16 +379,10 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-
-
-
-
-
-
 met.clean %>%
   #filter(Metabolite %in% c('Malonyl-CoA','Fumaric acid','Malic acid')) %>%
   ggplot(aes(x=SGroup,y=Conc_log,color=Metformin_mM))+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
+  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +
   geom_point()+
   scale_y_continuous(breaks=seq(-20,20,by=1))+
   geom_text(aes(label=Replicate),color='black',size=2)+
@@ -414,7 +405,7 @@ dev.copy2pdf(device=cairo_pdf,
 
 ggplot(met.clean,aes(x=SGroup,y=Conc,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
-  stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
+  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +
   geom_point()+
   #scale_y_continuous(breaks=seq(-20,20,by=1))+
   geom_text(aes(label=Replicate),color='black',size=2)+
@@ -458,7 +449,6 @@ ggplot(met.clean,aes(x=Conc))+
        linetype='Metformin, mM')+
   facet_wrap(~Metabolite,ncol = 4,scales='free_x')
 
-#aes(y=..scaled..),
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Density_Conc_by_metabolite.pdf",sep=''),
@@ -497,7 +487,7 @@ dev.copy2pdf(device=cairo_pdf,
 #Linear modelling
 
 contrasts<-read.contrasts('!Contrasts_Ecoli_HMT_metabolomics.xlsx')
-strainlist<-c('OP50','CRP','oeCRP')
+strainlist<-c('OP50-C','crp','oecrp')
 
 contrasts.desc<-contrasts$Contrasts.table %>%
   mutate(Strain=factor(Strain,levels=strainlist,labels=strainlist)) %>%
@@ -510,7 +500,10 @@ contr.matrix<-contrasts$Contrasts.matrix
 contrasts.desc
 contr.matrix
 
+#Results withou glucose dataset
 odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
+
+
 results.all<-met.clean %>%
   #filter(Metabolite=='Gly') %>%
   filter(Supplement!='Glucose') %>%
@@ -564,16 +557,6 @@ write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/All_results_sidebyside.csv',sep=''),row.names = FALSE)
 write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full.csv',sep=''),row.names = FALSE)
 
-
-# 
-# 
-# allcontrs<-unique(as.character(results$Contrast))
-# allmets<-unique(as.character(results$Metabolite))
-
-
-
-resultsmin<-results %>%
-  select(Metabolite,Contrast,logFC:logFDR)
 
 
 results.multi2<-multiplex(results,c("Metabolite","Metabolite_ID","Metabolite_full","KEGG_ID","HMDB_ID"),dim=2)
@@ -639,7 +622,7 @@ VolcanoPlot<-function(data,selmets=c()){
   if (length(selmets)==0){
     plot<-plot+geom_text_repel(aes(label=ifelse(FDR <0.05,as.character(Metabolite),'')),size=2)
   } else {
-    plot<-plot+geom_text_repel(aes(label=ifelse(Metabolite %in% selmets & FDR<0.05,as.character(Metabolite),'')),size=2)
+    plot<-plot+geom_text_repel(aes(label=ifelse(Metabolite %in% selmets & FDR<0.05,as.character(Metabolite),'')),size=5)
   }
   
   return(plot)
@@ -703,15 +686,20 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_Interaction.pdf',sep = '
 
 
 
+
+
+sel.comp<-c("Treatment effect on OP50-C","Treatment effect on crp","Mutant difference for oecrp+IPTG50","Mutant difference for oecrp+IPTG100")
+
+
 sel.mets<-results %>%
-  filter(Description %in% comparisons) %>%
+  filter(Description %in% sel.comp) %>%
   select(Contrast,Metabolite,FDR) %>%
   spread(Contrast,FDR) %>%
   filter(C_Metf<0.05  & CRP_Metf>0.05 & (oeCRP50<0.05 & oeCRP100<0.05) )%>%
   pull(Metabolite)
 
 sel.mets2<-results %>%
-  filter(Description %in% comparisons) %>%
+  filter(Description %in% sel.comp) %>%
   select(Contrast,Metabolite,logFC) %>%
   spread(Contrast,logFC) %>%
   filter(sign(C_Metf)==sign(oeCRP50) & sign(C_Metf)==sign(oeCRP100) ) %>%
@@ -725,8 +713,8 @@ results %>%
   filter(Contrast %in% c('C_Metf','CRP_Metf','oeCRP50','oeCRP100') ) %>%
   VolcanoPlot(mets)
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_Publication_4.pdf',sep = ''),
-             width=7,height=5,useDingbats=FALSE)
+ggsave(file=paste(odir,'/Volcano_Publication_4.pdf',sep = ''),
+       width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 
@@ -746,11 +734,6 @@ results %>%
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_Metformin_and_CRP.pdf',sep = ''),
              width=12,height=8,useDingbats=FALSE)
-
-
-
-
-
 
 
 #Venn diagram
@@ -800,102 +783,32 @@ dev.copy2pdf(device=cairo_pdf,
 dev.off()#
 
 
-
-#Heatmap for summary
-plotCHeatmap<-function(results,comparisons,mets){
-  
-  heatsum<-results %>%
-    filter(Description %in% comparisons & Metabolite %in% mets) %>%
-    select(Description,Metabolite,logFC) %>%
-    spread(Description,logFC) %>%
-    data.frame(check.names = FALSE,check.rows = FALSE)
-  
-  
-  rownames(heatsum)<-heatsum$Metabolite
-  heatsum$Metabolite<-NULL
-  
-  
-  max(heatsum)
-  min(heatsum)
-  
-  amp<-8
-  
-  minv<- -amp
-  maxv<- amp
-  
-  nstep<-maxv-minv
-  nstep<-8
-  
-  clrbrks<-seq(-amp,amp,by=2)
-  clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
-  
-  d<-dist(as.matrix(heatsum),method = "euclidean")
-  h<-hclust(d,method="ward.D2")
-  ordmet<-rownames(heatsum[h$order,])
-  
-  
-  
-  if (length(ordmet)!=length(unique(ordmet))){
-    print("Non unique metabolites!")
-  }
-  
-  
-  results.sum<-results %>%
-    filter(Metabolite %in% ordmet & Description %in% comparisons) %>%
-    mutate(Metabolite=factor(Metabolite,levels=ordmet,labels=ordmet),
-           Description=factor(Description,levels=comparisons,labels=comparisons),
-           FDRstars=gtools::stars.pval(FDR))
-  
-  
-  ggplot(results.sum,aes(x=Description,y=Metabolite))+
-    geom_tile(aes(fill=logFC))+
-    #geom_point(aes(size=FDRc,colour=logFC),alpha=0.9)+
-    theme_minimal()+
-    geom_text(aes(label=as.character(FDRstars)))+
-    #scale_size_discrete(range = c(2,4))+#,breaks=brks
-    scale_fill_gradientn(colours = clrscale,
-                         breaks=clrbrks,limits=c(-amp,amp))+
-    #scale_fill_gradient2(low = "purple", mid = "gray", high = "red", midpoint = 0, breaks = clrbrks)+
-    xlab("Comparison")+
-    theme(axis.ticks=element_blank(),
-          panel.border=element_blank(),
-          panel.grid.minor = element_blank(),
-          panel.grid.major = element_blank(),
-          axis.text.x = element_text(angle = 90, hjust = 1))
-  
-}
-
-unique(as.character(results$Description))
+# 
+# comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
+#                "Treatment effect on OP50+Glucose","Glucose effect on OP50","Mutant difference for CRP",
+#                "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100",
+#                "Interaction between metformin and Glucose","Interaction between metformin and CRP")
+# 
+# 
+# 
+# comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
+#                "Treatment effect on OP50+Glucose","Mutant difference for CRP","Glucose effect on OP50",
+#                "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100")
+# 
+# 
+# comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
+#                "Treatment effect on OP50+Glucose",
+#                "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100")
+# 
+# 
+# 
+# comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
+#                "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100")
 
 
 
+sel.comp<-c("Treatment effect on OP50-C","Treatment effect on crp","Mutant difference for oecrp+IPTG50","Mutant difference for oecrp+IPTG100")
 
-
-comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
-               "Treatment effect on OP50+Glucose","Glucose effect on OP50","Mutant difference for CRP",
-               "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100",
-               "Interaction between metformin and Glucose","Interaction between metformin and CRP")
-
-
-
-comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
-               "Treatment effect on OP50+Glucose","Mutant difference for CRP","Glucose effect on OP50",
-               "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100")
-
-
-comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
-               "Treatment effect on OP50+Glucose",
-               "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100")
-
-
-
-comparisons<-c("Treatment effect on OP50","Treatment effect on CRP",
-               "Mutant difference for oeCRP+IPTG50", "Mutant difference for oeCRP+IPTG100")
-
-#, "Mutant difference for oeCRP+IPTG100"
-
-
-#"Treatment effect on OP50+Glucose",
 
 #Filter metabolites for clean heatmap
 sel.mets<-results %>%
@@ -906,18 +819,40 @@ sel.mets<-results %>%
   ungroup %>%
   spread(Contrast,FDR)
 
-
-
 #Chosen
 
 
-comparisons<-c("Treatment effect on OP50","Treatment effect on CRP","Mutant difference for oeCRP+IPTG50","Mutant difference for oeCRP+IPTG100")
+amp<-6
 
-plotCHeatmap(results,comparisons,mets)
+minv<- -amp
+maxv<- amp
+
+nstep<-maxv-minv
+nstep<-6
+
+clrbrks<-seq(-amp,amp,by=2)
+clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
 
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP50-100_stat_filter_conservative.pdf',sep = ''),
-             width=3,height=5,useDingbats=FALSE)
+
+
+
+results %>%
+  filter(Description %in% sel.comp & Metabolite %in% mets) %>%
+  mutate(Description=factor(Description,levels=sel.comp,labels=sel.comp)) %>%
+  clustorder("Metabolite","Description","logFC",descending = TRUE) %>%
+  ggplot(aes(x=Description,y=Metabolite))+
+  geom_tile(aes(fill=logFC))+
+  geom_text(aes(label=as.character(FDRStars)))+
+  scale_fill_gradientn(colours = clrscale,
+                       breaks=clrbrks,limits=c(-amp,amp))+
+  xlab("Comparison")+
+  theme_Heatmap()+
+  theme(axis.text.x = element_text(angle=45))
+
+
+ggsave(file=paste0(odir,'/Comparison_Heatmap_Treatments_and_oeCRP50-100_stat_filter_conservative.pdf'),
+       width=55,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 #Generate table
@@ -925,7 +860,7 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_an
 
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Complete_tidy.pdf',sep = ''),
-             width=6,height=16,useDingbats=FALSE)
+             width=100,height=80,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP_All.pdf',sep = ''),
@@ -941,4 +876,279 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_an
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP50_stat_filter.pdf',sep = ''),
              width=4,height=8,useDingbats=FALSE)
 
+
+#For pathways
+
+unique(metpath$PID)
+
+
+patmets<-c("G1P","G6P","F6P","F1,6P","DHAP","Glyceraldehyde 3-phosphate","3-PG","2-PG","PEP","Pyruvic acid",
+           "AcCoA","Malonyl-CoA","Citric acid","cis-Aconitic acid","2-OG","Succinic acid","Fumaric acid","Malic acid",
+           "Asp","Asn","Arg","ArgSuccinate","Glu","Gln",
+           "NAD+","NADP+","NADH","NADPH")
+
+
+
+
+
+results %>%
+  filter(Contrast %in% c("C_Metf")) %>%
+  View
+
+
+
+amp<-2
+
+minv<- -amp
+maxv<- amp
+
+nstep<-maxv-minv
+nstep<-10
+
+clrbrks<-seq(-amp,amp,by=1)
+#patclrscale <- colorRampPalette(c("purple", "gray50","green"))(n = nstep)
+clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
+
+
+results %>%
+  filter(Contrast %in% c("C_Metf","CRP_Metf","oeCRP100") ) %>% #& Metabolite %in% patmets Metabolite=factor(Metabolite,levels=rev(patmets) ),
+  mutate(logFC=ifelse(logFC> 2,2,logFC),
+         logFC=ifelse(logFC< -2,-2,logFC)) %>%
+  ggplot(aes(x=Description,y=Metabolite))+
+  geom_tile(aes(fill=logFC))+
+  #geom_text(aes(label=as.character(FDRStars)))+
+  scale_fill_gradientn(colours = clrscale,
+                       breaks=clrbrks,limits=c(-amp,amp))+
+  xlab("Comparison")+
+  theme_Heatmap()+
+  theme(axis.text.x = element_text(angle=45))
+
+
+ggsave(file=paste0(odir,'/Comparison_Heatmap_For_pathway_bluered.pdf'),
+       width=55,height=110,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+ggsave(file=paste0(odir,'/Comparison_Heatmap_For_pathway_bluered_all.pdf'),
+       width=55,height=330,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+min(results$logFC)
+max(results$logFC)
+
+unique(results$Contrast)
+
+
+
+#Enrichment
+
+#Pathways to ECID
+ecp<-read_csv("~/Dropbox/Projects/2015-Metformin/Annotations/Ecoli/EcoCyc_pathways_metabolites_2018-03-30.csv") %>%
+  select(-X1) %>%
+  rename(PID=`Pathway-ID`,Pathway=`Pathway-Name`,EC_ID=Compounds) %>%
+  separate_rows(EC_ID,sep=";")
+
+
+#ECID to KEGG & HMDB IDs
+ecids<-read_csv("~/Dropbox/Projects/2015-Metformin/Annotations/Ecoli/EcoCyc_metabolites_KEGG_HMDB_2018-03-30.csv") %>%
+  select(-X1) %>%
+  rename(HMDB=`|HMDB|`,KEGG=`|LIGAND-CPD|`,Object_ID=Compound_ID,EC_ID=Instances) %>%
+  gather(DB,ID,HMDB,KEGG) %>%
+  #filter(!is.na(ID)) %>%
+  separate_rows(EC_ID,sep=";")
+
+ecids %>%
+  filter(EC_ID=="|FRUCTOSE-6P|")
+
+
+#Metabolites to KEGG & HMDB IDs
+metids<-met.all %>%
+  group_by(Metabolite_ID,Metabolite,Metabolite_full,KEGG_ID,HMDB_ID) %>%
+  summarise %>%
+  rename(KEGG=KEGG_ID,HMDB=HMDB_ID) %>%
+  gather(DB,ID,KEGG,HMDB) %>%
+  separate_rows(ID,sep=",") %>%
+  filter(Metabolite_ID!="-")
+
+
+metfix<-read_csv(paste0(odir,"/Missing_EcoCyc_pathway_links_manual.csv")) %>%
+  rename(EC_IDfix=EC_ID)
+
+
+#Metabolite - Pathway links
+mecp<-metids %>%
+  left_join(ecids) %>%
+  left_join(metfix) %>%
+  mutate(EC_ID=ifelse(is.na(EC_ID) & !is.na(EC_IDfix),EC_IDfix,EC_ID),
+         EC_IDfix=NULL) %>%
+  left_join(ecp) %>%
+  filter(!is.na(PID) & !is.na(EC_ID)) %>%
+  group_by(Metabolite_ID,Metabolite,PID) %>%
+  filter(row_number() == 1) %>%
+  select(Metabolite_ID,Metabolite,Metabolite_full,EC_ID,DB,ID,PID,Pathway)
+
+
+mecp %>%
+  filter(is.na(PID)) %>%
+  View
+
+
+#20 metabolites could not be assigned to pathwyas
+length(unique(mecp$Metabolite))
+length(unique(metids$Metabolite))
+
+nopath<-setdiff(unique(metids$Metabolite),unique(mecp$Metabolite))
+nopath
+
+metids %>%
+  filter(Metabolite %in% nopath) %>%
+  group_by(Metabolite_ID,Metabolite,Metabolite_full) %>%
+  summarise %>% 
+  write_csv(paste0(odir,"/Missing_EcoCyc_pathway_links.csv"))
+
+
+groups<-c("PID","Pathway")
+
+metpath<-results %>%
+  right_join(mecp %>% filter(!is.na(PID) & !is.na(EC_ID))) %>%
+  filter(!is.na(FDR) & !is.na(PID) ) %>%
+  group_by(Contrast,PID) %>%
+  mutate(Pathway_size=n()) %>%
+  ungroup
+  
+metpath %>%
+  group_by(Contrast,PID,Pathway,Pathway_size) %>%
+  summarise %>%
+  group_by(Contrast,Pathway_size) %>%
+  summarise(Count=n()) %>%
+  View
+
+
+
+
+enrtest<-results %>%
+  group_by(Contrast,Description,Contrast_type,Strain,Supplement)
+
+
+grouping<-group_vars(enrtest)
+
+
+uniques %>%
+  mutate(Up=logFC>0 & FDR <0.05,
+         Down=logFC<0 & FDR <0.05,
+         All=FDR<0.05) %>%
+  #gather different thresholds
+  gather(Type,Pass,Up,Down,All) %>%
+  group_by_(.dots=c(grouping,"KEGG_ID","Pass","Type")) %>%
+  summarise %>%
+  group_by_(.dots=c(grouping,"Type")) %>%
+  summarise(Unique_size=n(),
+         Unique_pass=sum(Pass,na.rm = TRUE) ) %>%
+  View
+
+
+
+head(metpath)
+
+EcoCycenrich<-metpath %>%
+  filter(Pathway_size>2) %>%
+  group_by(Contrast,Description,Contrast_type,Strain,Supplement) %>%
+  enrichment(groups,"Metabolite_ID",enrtype="regular")
+
+EcoCycenrich %>%
+  View
+
+
+EcoCycenrich %>%
+  write_csv(paste0(odir,"/All_Enrichment_EcoCyc.csv"))
+
+
+
+
+
+
+glimpse(EcoCycenrich)
+
+
+EcoCycenrich %>%
+  filter(p.value<0.05) %>%
+  View
+
+head(EcoCycenrich)
+
+
+EcoCycenrich %>%
+  filter(Contrast %in% c("C_Metf","CRP_Metf","oeCRP50","oeCRP100") & Type %in% c("Up","Down")) %>%
+  group_by(PID) %>%
+  filter( any(p.value<0.05)) %>%
+  mutate(logp=-log10(p.value) ) %>%
+  ungroup %>%
+  clustorder('Pathway',c("Contrast","Type"),'logp',descending=TRUE) %>%
+  PlotEnrichment("Type","Pathway",fillval = "logpbin")+
+  facet_grid(.~Description)+
+  ylab("EcoCyc pathway")+
+  labs(fill="p")+
+  theme(strip.text.x = element_text(angle=90,size=7))
+
+ggsave(file=paste(odir,'/Enrichment_heatmap_EcoCyc_p.pdf',sep = ''),
+       width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
+#KEGG info
+path2pathde<-limma::getKEGGPathwayNames('eco',remove.qualifier = TRUE)
+path2pathde$PathwayID<-gsub('path:','',path2pathde$PathwayID)
+allpaths<-gsub('eco','',path2pathde$PathwayID)
+
+write.csv(path2pathde,paste(odir,'/KEGG/KEGG_pathways.csv',sep=''))
+
+
+#KEGG mapping
+#Mapping part
+
+
+
+
+
+all.kegg.mappings<-read_csv(paste0(odir,"/All_KEGG_mappings_Complete.csv")) %>%
+  
+KEGGmets<-all.kegg.mappings %>%
+  filter(all.mapped!="") %>%
+  group_by(PathwayID,Description,all.mapped) %>%
+  summarise %>%
+  rename(KEGG_ID=all.mapped,Pathway=Description)
+
+
+KEGGgroups<-c("PathwayID","Pathway")
+
+KEGGenrich<-results.ecocel %>%
+  separate_rows(KEGG_ID,sep=",") %>%
+  left_join(KEGGmets) %>%
+  
+  filter(!is.na(KEGG_ID) & !is.na(PathwayID) & !is.na(FDR) & !PathwayID %in% c("eco01502")) %>%
+  
+  group_by(Contrast,Description,Contrast_type,Strain,Supplement) %>%
+  enrichment(KEGGgroups,"KEGG_ID")
+
+
+KEGGenrich %>%
+  write_csv(paste0(odir,"/All_Enrichment_KEGG.csv"))
+
+
+KEGGenrich %>%
+  filter(Contrast %in% c("C_Metf","CRP_Metf","oeCRP50","oeCRP100") & Type %in% c("Up","Down")) %>%
+  group_by(PathwayID) %>%
+  filter( any(p.value<0.05)) %>%
+  mutate(logp=-log10(p.value) ) %>%
+  ungroup %>%
+  clustorder('Pathway',c("Contrast","Type"),'logp',descending=TRUE) %>%
+  PlotEnrichment("Type","Pathway",fillval = "logpbin")+
+  facet_grid(.~Description)+
+  ylab("KEGG pathway")+
+  labs(fill="p")+
+  theme(strip.text.x = element_text(angle=90,size=7))
+
+ggsave(file=paste(odir,'/Enrichment_heatmap_KEGG_p.pdf',sep = ''),
+       width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 

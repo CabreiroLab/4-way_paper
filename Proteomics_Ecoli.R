@@ -44,49 +44,14 @@ library(qdap)
 
 
 
-theme_Publication <- function(base_size=14) {
-  
-  (theme_foundation(base_size=base_size)
-   + theme(plot.title = element_text(face = "bold",
-                                     size = rel(1.2), hjust = 0.5),
-           text = element_text(),
-           panel.background = element_rect(colour = NA),
-           plot.background = element_rect(colour = NA),
-           #panel.border = element_rect(colour = NA),
-           axis.title = element_text(face = "bold",size = rel(1)),
-           axis.title.y = element_text(angle=90,vjust =2),
-           axis.title.x = element_text(vjust = -0.2),
-           axis.text = element_text(), 
-           axis.line = element_line(colour="black"),
-           axis.ticks = element_line(),
-           panel.grid.major = element_line(colour="#f0f0f0"),
-           panel.grid.minor = element_blank(),
-           legend.key = element_rect(colour = NA),
-           #legend.position = "bottom",
-           #legend.direction = "horizontal",
-           #legend.key.size= unit(0.2, "cm"),
-           #legend.margin = unit(0, "cm"),
-           legend.title = element_text(face="italic"),
-           #plot.margin=unit(c(10,5,5,5),"mm"),
-           strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
-           strip.text = element_text(face="bold")
-   ))
-  
-}
-
-theme_set(theme_Publication())
-
-
-
-#theme_set(theme_light())
-
-# theme_update(panel.background = element_rect(colour = "black"),
-#              axis.text = element_text(colour = "black"))
-
-remove(enrichmentprep)
-
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
+#New default theme
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
+
+
 
 
 cwd<-"~/Dropbox/Projects/2015-Metformin/Proteomics/"
@@ -271,8 +236,17 @@ dim(prot.c)
 
 #Clean data
 
+prot.c %>%
+  group_by(Sample,Strain,Metformin_mM) %>%
+  summarise
 
-metslm.f<-dcast(prot.c,Sample+Group+Strain+Metformin_mM~Spot,value.var = 'log2SA_F')
+
+pcaresults<-prot.c %>%
+  PCAprep("Sample","Spot","")
+
+
+
+metslm.f<-dcast(subset(prot.c,Strain=="OP50-C"),Sample+Group+Strain+Metformin_mM~Spot,value.var = 'log2SA_F')
 rownames(metslm.f)<-metslm.f$Sample
 
 
@@ -370,12 +344,13 @@ PC2prc<-round(pcaresult['Proportion of Variance',][[2]]*100,0)
 ellipses<-ddply(pcadata,.(Strain,Group,Metformin_mM), summarise, x=getellipse(PC1,PC2,1)$x,y=getellipse(PC1,PC2,0.75)$y ) 
 
 
-ggplot(pcadata,aes(x=PC1,y=PC2,colour=Strain))+
+pcadata %>%
+  ggplot(aes(x=PC1,y=PC2,colour=Metformin_mM))+
   xlab(paste('PC1 - ',PC1prc,'% of variance',sep=''))+
   ylab(paste('PC2 - ',PC2prc,'% of variance',sep=''))+
   geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),linetype=Metformin_mM),size=1)+ 
   geom_point(aes(fill=factor( ifelse(Metformin_mM==0,Strain, NA ) ) ),size=5,stroke=1,shape=21)+
-  scale_linetype_manual("Drug, mM",values=c("0"=1,"50"=2))+
+  scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
   scale_fill_discrete(na.value=NA, guide="none")+
   guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour='black',fill=c(1,NA))))+
   geom_text(aes(label=Sample))+
