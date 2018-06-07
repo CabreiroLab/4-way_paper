@@ -26,7 +26,7 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 miss<-c('nac','marA')
 
-strainlist<-c('OP50-C','crp','cra','argR','ntrC','arcA','csiR','fur','gcvA','mlc')
+strainlist<-c('OP50-C','crp','cra','argR','ntrC','arcA','csiR','fur','gcvA','marA','mlc','nac')
 metf<-c("0","25","50","75","100","150")
 
 
@@ -39,7 +39,13 @@ mutdata<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Mutants/Summary.c
   filter(Strain %in% c('crp','mlc','OP50-C'))
 
 
+newdata<-read_csv('TF/Data_new/Summary.csv')
+
+newdatats<-read_csv('TF/Data_new/Data.csv')
+
+
 data<-read_csv('TF/Data/Summary.csv') %>%
+  rbind(newdata) %>%
   rbind(mutdata) %>%
   filter(!is.na(Strain) ) %>%
   select(Plate:TReplicate,logAUC=Int_600nm_log,Dph=a_log,-Data) %>%
@@ -91,6 +97,7 @@ mutdatats<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Mutants/Data.cs
   
   
 data_ts<-read_csv('TF/Data/Data.csv') %>%
+  rbind(newdatats) %>%
   rbind(mutdatats) %>%
   filter(!is.na(Strain) ) %>%
   filter(Data=='600nm_f') %>%
@@ -120,7 +127,7 @@ ggplot(data_ts,aes(x=Time_h,y=OD,color=Metformin_mM))+
   xlab('Time, h')+
   scale_colour_manual(name = Metlab,values =Metcols)+
   scale_x_continuous(breaks=seq(0,24,by=6))+
-  facet_wrap(~Strain,ncol=5)
+  facet_wrap(~Strain,ncol=6)
 
 
 ggsave(file=paste(odir,"/Growth_overview.pdf",sep=''),
@@ -137,7 +144,7 @@ datats.sum<-data_ts %>%
 Metlab2<-"Metformin, mM"
 
 datats.sum %>%
-  filter(Strain %in% c("OP50-C","crp","cra","argR","ntrC") ) %>%
+  #filter(Strain %in% c("OP50-C","crp","cra","argR","ntrC","marA","nac") ) %>%
   ggplot(aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   geom_line()+
   geom_ribbon(aes(ymin=OD_Mean-OD_SD,
@@ -147,10 +154,14 @@ datats.sum %>%
   scale_colour_manual(name = Metlab,values = Metcols)+
   scale_fill_manual(name = Metlab,values = Metcols)+
   scale_x_continuous(breaks=seq(0,18,by=6))+
-  facet_wrap(~Strain,ncol=5)
+  facet_wrap(~Strain,ncol=6)
 
-ggsave(file=paste0(odir,"/Growth_Summary_horizontal_selection.pdf"),
-       width=90,height=25,units='mm',scale=2,device=cairo_pdf,family="Arial")
+ggsave(file=paste0(odir,"/Growth_Summary_horizontal.pdf"),
+       width=110,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+# ggsave(file=paste0(odir,"/Growth_Summary_horizontal.pdf"),
+#        width=90,height=25,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
 
 
 PlotBox<-function(data,yvar,ytitle,title) {
@@ -198,6 +209,23 @@ stat<-data %>%
          PrcPE=2^PE*100,
          pStars=pStars(p.value)) 
 
+
+
+stat2<-data %>%
+  filter(Measure=="logAUC" & Normalisation=="Value") %>%
+  do(tidy(lm(Value~Strain*Metformin_mM,data=.))) %>%
+  filter(str_detect(term,":")) %>%
+  rename(logFC=estimate,SE=std.error,t.value=statistic,p=p.value) %>%
+  mutate(term=str_replace_all(term,"Strain|Metformin_mM","")) %>%
+  separate(term,c("Strain","Metformin_mM"),sep=":") %>%
+  mutate(Comparison="Interaction",
+         Strain=factor(Strain,levels=strainlist),
+         pStars=pStars(p)) %>%
+  ungroup
+
+
+
+
 # Metformin_mM=str_extract(term,'[[:digit:]]{1,3}'),
 # Metformin_mM=factor(Metformin_mM,levels=metf ),
 
@@ -231,7 +259,7 @@ stat %>%
   geom_text(data=stat %>%
               filter(Measure=='AUC' & Normalisation=="Norm_C"),
             aes(label=pStars),color='black',y = 125)+
-  facet_wrap(~Strain,ncol=5)
+  facet_wrap(~Strain,ncol=6)
 
 ggsave(file=paste(odir,"/Growth_Comparison_vs_OP50-C_Control.pdf",sep=''),
              width=120,height=60,units='mm',scale=2,device=cairo_pdf,family="Arial")
@@ -245,10 +273,41 @@ ggsave(file=paste(odir,"/Growth_Comparison_vs_OP50-C_Control.pdf",sep=''),
 # names(Straincols) <- strainlist
 # Strainlab<-"Strain"
 
-PlotComp<-function(data,stat,meas,measname) {
-  stars<-stat %>%
-    filter(Measure==meas,Normalisation=="Norm_C")
 
+
+Straincols<-ggthemes::tableau_color_pal(palette = "tableau20")(12)
+names(Straincols) <- strainlist
+
+
+PlotComp<-function(data,stars,measname) {
+
+  data %>%
+    ggplot(aes(x=Metformin_mM,y=Prc,color=Strain,fill=Strain))+
+    scale_y_continuous(breaks=seq(0,200,by=25))+
+    coord_cartesian(ylim=c(0,175))+
+    geom_hline(aes(yintercept = 100),color='gray75',linetype='longdash')+
+    geom_ribbon(aes(group=interaction(Strain),
+                    ymin=PrcNE,
+                    ymax=PrcPE),
+                alpha=0.75,
+                color=NA,
+                show.legend=FALSE)+
+    geom_line(aes(group=interaction(Strain)))+
+    #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
+    geom_point()+
+    #ggtitle("Significance shown for differences vs OP50-C")+
+    scale_colour_manual(name = Strainlab,values = Straincols)+
+    scale_fill_manual(name = Strainlab,values = Straincols)+
+    labs(color='Strain',fill='Strain')+
+    ylab(paste0(measname," vs OP50-C Control, %") )+
+    xlab("Metformin, mM")+
+    geom_text(data=stars,
+              aes(label=pStars,y=50-as.numeric(Strain)*5 ),nudge_y = 135, show.legend = FALSE,size=5)
+}
+
+
+PlotComp2<-function(data,stars,measname) {
+  
   data %>%
     ggplot(aes(x=Metformin_mM,y=Prc,color=Strain,fill=Strain))+
     scale_y_continuous(breaks=seq(0,200,by=25))+
@@ -264,78 +323,65 @@ PlotComp<-function(data,stat,meas,measname) {
     #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
     geom_point()+
     #ggtitle("Significance shown for differences vs OP50-C")+
-    #scale_colour_manual(name = Strainlab,values = Straincols)+
-    #scale_fill_manual(name = Strainlab,values = Straincols)+
+    scale_colour_manual(name = Strainlab,values = Straincols)+
+    scale_fill_manual(name = Strainlab,values = Straincols)+
     labs(color='Strain',fill='Strain')+
     ylab(paste0(measname," vs OP50-C Control, %") )+
     xlab("Metformin, mM")+
     geom_text(data=stars,
-              aes(label=pStars,y=40-as.numeric(Strain)*4 ),nudge_y = 125, show.legend = FALSE,size=5)
+              aes(label=pStars,y=50-as.numeric(Strain)*5 ),nudge_y = 130 , show.legend = FALSE,size=5) #nudge.y=100
 }
 
 
-PlotComp2<-function(data,stat,meas,measname) {
-  stars<-stat %>%
-    filter(Measure==meas,Normalisation=="Norm_C")
-  
-  data %>%
-    ggplot(aes(x=Metformin_mM,y=Prc,color=Strain,fill=Strain))+
-    scale_y_continuous(breaks=seq(0,200,by=25))+
-    coord_cartesian(ylim=c(0,140))+
-    geom_hline(aes(yintercept = 100),color='gray75',linetype='longdash')+
-    geom_ribbon(aes(group=interaction(Strain),
-                    ymin=PrcNE,
-                    ymax=PrcPE),
-                alpha=0.75,
-                color=NA,
-                show.legend=FALSE)+
-    geom_line(aes(group=interaction(Strain)))+
-    #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
-    geom_point()+
-    #ggtitle("Significance shown for differences vs OP50-C")+
-    #scale_colour_manual(name = Strainlab,values = Straincols)+
-    #scale_fill_manual(name = Strainlab,values = Straincols)+
-    labs(color='Strain',fill='Strain')+
-    ylab(paste0(measname," vs OP50-C Control, %") )+
-    xlab("Metformin, mM")+
-    geom_text(data=stars,
-              aes(label=pStars,y=40-as.numeric(Strain)*5 ),nudge_y = 130 , show.legend = FALSE,size=5) #nudge.y=100
-}
 
-
-#"OP50-C",
-data.sum %>%
-  filter(Normalisation=="Norm_CM" & Measure=="logAUC" & ! Strain %in% c("crp","cra","argR","ntrC")) %>% 
-  PlotComp2(.,stat %>% filter(!Strain %in% c("crp","cra","argR","ntrC")),unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )+
-  ylab("Growth AUC vs OP50-C Control, %" )
-
-ggsave(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_logAUC_SD_NOTselection.pdf"),
-       width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial")
-
-
+#"OP50-C",& ! Strain %in% c("crp","cra","argR","ntrC")
+# data.sum %>%
+#   filter(Normalisation=="Norm_CM" & Measure=="logAUC" ) %>% 
+#   PlotComp2(.,stat %>% filter(!Strain %in% c("crp","cra","argR","ntrC") & Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"),unique(as.character(.$MeasShort)) )+
+#   ylab("Growth AUC vs OP50-C Control, %" )
+# 
+# 
+# 
+# ggsave(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_logAUC_SD.pdf"),
+#        width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial")
 
 
 Compplots<-data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
   group_by(Measure) %>%
-  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) )
+  do(plot=PlotComp(.,stat %>% filter(Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"), unique(as.character(.$MeasShort)) ) )
+
+
+
+Compplots.I<-data.sum %>%
+  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
+  group_by(Measure) %>%
+  do(plot=PlotComp(.,stat2, unique(as.character(.$MeasShort)) ) )
+
+
 
 Compwrap<-data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
   group_by(Measure) %>%
-  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain,ncol=5))
+  do(plot=PlotComp(.,stat %>% filter(Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain,ncol=6))
 
  
+
+
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_SD.pdf"),
      Compplots$plot,
      width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial",ggsave)
 
 
+map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_Interaction_SD.pdf"),
+     Compplots.I$plot,
+     width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial",ggsave)
+
 
 
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),"_SD.pdf"),
      Compwrap$plot,
-     width=110,height=40,units ='mm', scale=2,device=cairo_pdf,family="Arial",ggsave)
+     width=110,height=41,units ='mm', scale=2,device=cairo_pdf,family="Arial",ggsave)
 
 
 
@@ -353,6 +399,8 @@ data.sum2 %>%
   coord_cartesian(xlim = c(0,120),ylim=c(0,120))+
   geom_errorbar(aes(ymin=y_PrcNE,ymax=y_PrcPE),color=errcolor)+
   geom_errorbarh(aes(xmin=x_PrcNE,xmax=x_PrcPE),color=errcolor)+
+  scale_colour_manual(name = Strainlab,values = Straincols)+
+  scale_fill_manual(name = Strainlab,values = Straincols)+
   geom_line(aes(group=interaction(Strain),color=Strain,size=Metformin_mM),alpha=0.5)+
   geom_point(aes(color=Strain,size=Metformin_mM))+
   labs(size="Metformin,\nmM")+

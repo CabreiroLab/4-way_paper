@@ -163,8 +163,8 @@ data<-allfiles %>%
          NormAbs=2^NormLog) %>%
   ungroup 
 
-
-
+data %>%
+  write_csv(paste0(odir,"/All_data_raw.csv"))
 
 #NormNames<-data.frame(Normalisation=c("W_LogInt","Norm_G","Norm_M","Norm_GM"), NormName=c("Absolute","By Gene=OP50-C","By Metformin_mM=0","By Gene=OP50-C and Metformin_mM=0") )
 # data.norm<-data %>%

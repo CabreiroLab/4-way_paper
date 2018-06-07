@@ -27,7 +27,7 @@ strains<-c('OP50-C','OP50-MR','crp','cra')
 Sstrains<-c('OP50-C','OP50-C-Glu','OP50-MR','crp','cra')
 
 
-data <- read_csv('All_raw_data.csv') %>%
+data <- read_csv('All_raw_data_updated.csv') %>%
   filter(Type %in% c('CRP','RNAseq')) %>%
   mutate_at(c('Type','Gene','Strain','Metformin_mM','Supplement','SGroup','Condition','ID','Replicate'),as.factor) %>%
   mutate(Strain=factor(Strain,levels=strains),
@@ -37,6 +37,13 @@ data <- read_csv('All_raw_data.csv') %>%
 
 data %>%
   filter(Measure=='Log' & Strain=="OP50-C" & Gene=='dhs-23' & Metformin_mM==50 & NormAbs<2^6)
+
+
+
+
+data %>%
+  filter(Measure=='Log' & Strain=="OP50-C" & Gene=='MGH249' )
+
 
 
 unique(data$SGroup)
@@ -209,13 +216,11 @@ head(results.cast)
 View(results)
 
 
-View(results.new)
 
 
-
-write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
-write.csv(results.cast,paste(odir,'/All_results_sidebyside.csv',sep=''),row.names = FALSE)
-write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full.csv',sep=''),row.names = FALSE)
+write.csv(results,paste(odir,'/All_results_updated.csv',sep=''),row.names = FALSE)
+write.csv(results.cast,paste(odir,'/All_results_sidebyside_updated.csv',sep=''),row.names = FALSE)
+write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full_updated.csv',sep=''),row.names = FALSE)
 
 
 
@@ -367,7 +372,7 @@ nlpgene<-base::setdiff(unique(data$Gene),RNAgenes)
 
 
 
-crpgene<-c('acs-2','atgl-1','cpt-2','cpt-5','dhs-23')
+crpgene<-c('acs-2','atgl-1','cpt-2','cpt-5','dhs-23','MGH249')
 crpstrain<-c('OP50-C','crp','cra')
 
 
@@ -527,12 +532,12 @@ data %>%
   geom_text(data=showstats %>% filter(Contrast_type=="Treatment" ),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)+
   theme(legend.position="top",
         axis.text.x = element_text(angle = 45, hjust = 1))+
-  facet_wrap(~Gene,scale = "free_y",ncol=5)
+  facet_wrap(~Gene,scale = "free_y",ncol=6)
 
-ggsave(file=paste(odir,'/Fluorescence_logScale2_Fig5_CRP_transgenes.pdf',sep = ''),
-       width=62,height=40,units='mm',scale=2,device=cairo_pdf,family="Arial")
+ggsave(file=paste(odir,'/Fluorescence_logScale2_Fig5_CRP_transgenes_updated.pdf',sep = ''),
+       width=85,height=40,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
-
+#width=62
 
 
 
@@ -566,16 +571,17 @@ showstats %>%
          Labels=factor(Labels,levels=rev(c("OP50-C + 50mM Metf","crp + 50mM Metf","Interaction")) ) ) %>%
   ggplot(aes(x=Gene,y=Labels))+
   geom_tile(aes(fill=logFC))+
-  xlab("Strain")+
+  xlab("Gene")+
   ylab("Comparison")+
+  labs(fill="Fluorescence\nlogFC") +
   scale_fill_gradientn(colours = clrscale,
                        breaks=clrbrks,limits=c(-amp,amp))+
   geom_text(aes(label=as.character(pStars)))+
   theme_Heatmap()+
   theme(axis.text.x = element_text(angle=45))
 
-ggsave(file=paste(odir,'/Heatmap_Fluorescence_Fig5_CRP_transgenes_horizontal.pdf',sep = ''),
-       width=55,height=25,units='mm',scale=2,device=cairo_pdf,family="Arial")
+ggsave(file=paste(odir,'/Heatmap_Fluorescence_Fig5_CRP_transgenes_horizontal_updated.pdf',sep = ''),
+       width=70,height=25,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 

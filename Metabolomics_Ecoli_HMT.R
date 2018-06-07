@@ -610,12 +610,32 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Scatter_Various_vs_OP50_Meft.pdf
 
 
 
+
+
 #Volcano plots
+
+amp<-6
+
+minv<- -amp
+maxv<- amp
+
+nstep<-maxv-minv
+nstep<-10
+
+clrbrks<-seq(-amp,amp,by=2)
+#patclrscale <- colorRampPalette(c("purple", "gray50","green"))(n = nstep)
+clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
+
+
 VolcanoPlot<-function(data,selmets=c()){
-  plot<-ggplot(data,aes(x=logFC,y=logFDR,color=Strain))+
+  plot<-ggplot(data,aes(x=logFC,y=logFDR,colour=logFC))+
     geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
     geom_errorbarh(aes(xmin=NE,xmax=PE),alpha=erralpha,color=errcolor,height=0)+
     geom_point()+
+
+    scale_colour_gradientn(colours = clrscale,
+                         breaks=clrbrks,limits=c(-amp,amp))+
+    
     scale_y_continuous(breaks=seq(0,20,by=2))+
     scale_x_continuous(breaks=seq(-10,10,by=2))+
     facet_wrap(~Description,ncol = 2)
@@ -708,12 +728,11 @@ sel.mets2<-results %>%
 mets<-intersect(sel.mets2,sel.mets)
 
 
-
 results %>%
   filter(Contrast %in% c('C_Metf','CRP_Metf','oeCRP50','oeCRP100') ) %>%
   VolcanoPlot(mets)
 
-ggsave(file=paste(odir,'/Volcano_Publication_4.pdf',sep = ''),
+ggsave(file=paste(odir,'/Volcano_Publication_4_logFCcolor.pdf',sep = ''),
        width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
