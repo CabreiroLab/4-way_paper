@@ -1159,23 +1159,35 @@ D.down$Type<-'Down'
 
 D.comb<-rbind(D.all,D.up,D.down)
 
-write.csv(D.comb,paste0(odir,'/DAVID_enrichment.csv'))
-
+#write.csv(D.comb,paste0(odir,'/DAVID_enrichment.csv'))
 
 
 
 #Enrichment combined
+#TF enrichment
+TFsum<-read_csv('Results/TF_enrichment.csv')
+
+
 TF.en<-TFsum[TFsum$TvC_FDR<0.05,c('TF','TvC_p','TvC_FDR')]
 TF.en$Test<-'All'
 TF.en$Category<-'Transcription factor'
 TF.en<-rename(TF.en,c('TvC_p'='p','TvC_FDR'='FDR','TF'='Term'))
 TF.en<-TF.en[order(TF.en$FDR),]
 
+
+#KEGG enrichment
+
+
 KEGG.en<-subset(D.comb,FDR<0.05 &
                   !Term %in% c('eco01130:Biosynthesis of antibiotics') &
                   !Category %in% c('GOTERM_CC_DIRECT','GOTERM_MF_DIRECT','UP_SEQ_FEATURE'))[,c('Type','Category','Term','PValue','FDR')]
 KEGG.en<-rename(KEGG.en,c('Type'='Test','PValue'='p'))
 
+#EcoCyc Enrichment
+
+
+
+ece.en<-read_csv('Results/EcoCyc_enrichment.csv')
 EC.en<-subset(ece.en,FDR<0.05 & Contrast=='C_T-C_C')[,c('Test','Pathway','p','FDR')]
 EC.en$Category<-'EcoCyc'
 EC.en<-rename(EC.en,c('Pathway'='Term'))
@@ -1188,14 +1200,21 @@ head(EC.en)
 head(KEGG.en)
 
 all.en<-rbind(TF.en,EC.en,KEGG.en)[,c('Category','Test','Term','p','FDR')]
-all.en<-rename(all.en,c('FDR'='q'))
+
+
+all.en %>%
+  write_csv(paste0(odir,'/Enrichment_all.csv'))
+
+
+
+View(all.en)
 
 
 all.en.all<-subset(all.en,Test=='All')
 all.en.all$Test<-NULL
 
 all.en.all$p <- format(all.en.all$p, scientific = TRUE,digits = 2)
-all.en.all$q <- format(all.en.all$q, scientific = TRUE,digits = 2)
+all.en.all$FDR <- format(all.en.all$FDR, scientific = TRUE,digits = 2)
 
 #acetylation<-as.character(as.data.frame(splitstackshape::cSplit(subset(D.comb,Term=='Acetylation' & Type=='All'),splitCols = 'Genes',sep=',',direction='long'))$Genes)
 #subset(ece,ID=='NONOXIPENT-PWY')
@@ -1207,3 +1226,7 @@ library(grid)
 grid.table(all.en.all)
 dev.copy2pdf(device=cairo_pdf,file=paste0(odir,'/Enrichment_table.pdf'),
              width=10,height=6,useDingbats=FALSE)
+
+
+
+

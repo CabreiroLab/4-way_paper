@@ -181,6 +181,14 @@ results.all<-data.nc %>%
   getresults(contrasts.desc,c("Measure"))
 
 
+
+
+
+#Unfiltered results
+results.all$results %>%
+  write.csv(paste0(odir,'/Ecoli_unfiltered_results.csv'),row.names = FALSE)
+
+
 #Separate results
 results<-results.all$results %>%
   filter(MetaboliteU %in% selmets$MetaboliteU)
@@ -188,6 +196,7 @@ results<-results.all$results %>%
 
 results.cast<-results.all$cast %>% filter(Measure=='G') %>%
   filter(MetaboliteU %in% selmets$MetaboliteU)
+
 results.castfull<-results.all$castfull %>%
   filter(MetaboliteU %in% selmets$MetaboliteU) %>%
   filter(Measure=='G') %>%
@@ -200,7 +209,8 @@ results.castfull<-results.all$castfull %>%
 results.multi<-results.all$multi %>% filter(Measure=='G')
 
 
-ncresults<-c('Negative Control','L-Arabinose','Acetoacetic Acid','Phosphono Acetic Acid')
+
+#ncresults<-c('Negative Control','L-Arabinose','Acetoacetic Acid','Phosphono Acetic Acid')
 
 
 # oldresults<-results.all$results %>%

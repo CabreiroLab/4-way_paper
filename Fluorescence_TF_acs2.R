@@ -166,6 +166,9 @@ data<-allfiles %>%
 data %>%
   write_csv(paste0(odir,"/All_data_raw.csv"))
 
+
+
+
 #NormNames<-data.frame(Normalisation=c("W_LogInt","Norm_G","Norm_M","Norm_GM"), NormName=c("Absolute","By Gene=OP50-C","By Metformin_mM=0","By Gene=OP50-C and Metformin_mM=0") )
 # data.norm<-data %>%
 #   group_by(Metformin_mM) %>%
@@ -343,6 +346,48 @@ ggsave(file=paste(odir,'/Fluorescence_logScale2.pdf',sep = ''),
 
 
 
+#Treatment figure:
+
+
+
+Metcols2 <- c("#32006F","#FF0000")#colorRampPalette(c("red", "blue4"))(6)
+names(Metcols2) <- c("50","0")
+Metlab2<-'Metformin,\nmM'
+
+
+#quartz()
+data %>%
+  mutate(Metformin_mM=factor(Metformin_mM,levels=c(50,0))) %>%
+  ggplot+
+  aes(x=Gene,y=NormAbs,color=Metformin_mM)+
+  #geom_hline(data=CT,aes(yintercept = Ref,color=Metformin_mM))+
+  geom_jitter(aes(fill=Metformin_mM),width=0.25,size=1,alpha=0.5)+
+  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity",alpha=0.5) +#
+  #geom_blank(data = blank_data,aes(x=Gene,y=NormAbs))+
+  scale_y_continuous(trans = 'log2',
+                     breaks = scales::trans_breaks('log2', function(x) 2^x),
+                     labels = scales::trans_format('log2', scales::math_format(2^.x))) + 
+  scale_colour_manual(name = Metlab2,values =Metcols2)+
+  scale_fill_manual(name = Metlab2,values =Metcols2)+
+  ylab('Mean fluorescence per worm, a.u.')+
+  xlab('Gene')+
+  #geom_text(data=showstats %>% filter(Contrast_type=="Gene" & Metformin_mM=="50" ) ,aes(label=pStars,y=2^7.25),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
+  #geom_text(data=showstats %>% filter(Contrast_type=="Interaction"),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,color="green4",nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)+
+  #geom_text(data=showstats %>% filter(Contrast_type=="Gene"& Metformin_mM=="0") ,aes(label=pStars,y=2^4.75),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
+  #theme(legend.position="top")+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        strip.text.y = element_blank())+
+  facet_grid(Metformin_mM~.,scales = "free_y")
+
+
+ggsave(file=paste(odir,'/Fluorescence_logScale2_axisbreak.pdf',sep = ''),
+       width=60,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
+
 #quartz()
 data %>%
   ggplot+
@@ -407,6 +452,30 @@ stats %>%
 
 ggsave(file=paste(odir,'/Heatmap_Fluorescence_vertical.pdf',sep = ''),
        width=34,height=63,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+stats %>%
+  filter(Contrast_type %in% c("Gene","Interaction")) %>%
+  mutate(Comparison=paste(Contrast_type,Metformin_mM),
+         Label=comps[Comparison],
+         Gene=factor(Gene,levels=unique(as.character(Gene)) )  ,
+         Label=factor(Label,levels=c("Difference","50mM Metf","0mM Metf"),labels=c("Interaction","50mM Metf","0mM Metf")) ) %>%
+  filter(Gene %in% c('crp','cra','argR','ntrC')) %>%
+  ggplot(aes(x=Gene,y=Label))+
+  geom_tile(aes(fill=logFC))+
+  ylab("Comparison")+
+  xlab("DIfference")+
+  labs(fill='Pacs-2::gfp\nlogFC vs\nOP50-C')+
+  scale_fill_gradientn(colours = clrscale,
+                       breaks=clrbrks,limits=c(-amp,amp))+
+  geom_text(aes(label=as.character(pStars)))+
+  theme_Heatmap()+
+  theme(axis.text.x = element_text(angle=45))
+
+
+ggsave(file=paste(odir,'/Heatmap_Fluorescence_horizontal.pdf',sep = ''),
+       width=55,height=31,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 

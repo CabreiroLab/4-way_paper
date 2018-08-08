@@ -30,7 +30,7 @@ setwd(cwd)
 
 
 odir<-'Summary_Ecoli_HMT'
-odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
+#odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
 
 
 
@@ -132,16 +132,13 @@ met.all$Strain
 
 #grepl('CoA',Metabolite)
 
-met.all %>%
-  filter(!is.na(Prediction))
-
 
 write.csv(met.all,paste(odir,'/Raw_data_filled.csv',sep=''),row.names = FALSE)
 
 
 met.clean<-met.all %>%
   tbl_df %>%
-  filter(ID!='C_0_N_4') %>%
+  filter(ID!='C_0_N_4') %>% # One sample removed
   filter(Metabolite_ID!='-') %>%
   #Remove missing metabolites
   group_by(Metabolite) %>%
@@ -301,17 +298,17 @@ metcomplete %>%
 
 ggsave(file=paste(odir,"/PCA_NoGlucose.pdf",sep=''),
              width=70,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
-#What Filipe asked
-met.sel %>%
-  filter(!Supplement=='Glucose' & Strain %in% c('OP50','CRP')) %>%
-  PCAdata %>%
-  PCAplot
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/PCA_WhatFilipeAsked.pdf",sep=''),
-             width=12,height=9)
+# 
+# 
+# #What Filipe asked
+# met.sel %>%
+#   filter(!Supplement=='Glucose' & Strain %in% c('OP50','CRP')) %>%
+#   PCAdata %>%
+#   PCAplot
+# 
+# dev.copy2pdf(device=cairo_pdf,
+#              file=paste(odir,"/PCA_WhatFilipeAsked.pdf",sep=''),
+#              width=12,height=9)
 
 
 heatcomplete<-met.sel %>%
@@ -455,8 +452,8 @@ dev.copy2pdf(device=cairo_pdf,
              width=15,height=80, useDingbats=FALSE)
 
 
-#Summarise variance
 
+#Summarise variance
 sum.c<-met.clean %>%
   group_by(Metabolite,Group,Strain,Metformin_mM,Supplement) %>%
   summarise_at(vars(Conc,Conc_log),funs(SD=sd(.,na.rm = TRUE),Mean=mean(.,na.rm = TRUE))) %>%
@@ -501,12 +498,12 @@ contrasts.desc
 contr.matrix
 
 #Results withou glucose dataset
-odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
+#odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
 
 
 results.all<-met.clean %>%
   #filter(Metabolite=='Gly') %>%
-  filter(Supplement!='Glucose') %>%
+  #filter(Supplement!='Glucose') %>%
   group_by(Metabolite,Metabolite_ID,Metabolite_full,KEGG_ID,HMDB_ID) %>%
   do(hypothesise(.,"Conc_log~0+Group",contr.matrix)) %>%
   getresults(contrasts.desc)
@@ -708,51 +705,93 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_Interaction.pdf',sep = '
 
 
 
-sel.comp<-c("Treatment effect on OP50-C","Treatment effect on crp","Mutant difference for oecrp+IPTG50","Mutant difference for oecrp+IPTG100")
+#Find metabolites changing in metfomrin treatment and oeCRP
+#Without glucose
+#sel.comp<-c("Treatment effect on OP50-C","Treatment effect on crp","Mutant difference for oecrp+IPTG50","Mutant difference for oecrp+IPTG100")
 
+#With glucose
+sel.comp<-c("Treatment effect on OP50-C","Treatment effect on crp","Treatment effect on OP50-C + Glucose",
+            "Mutant difference for oecrp+IPTG50", "Mutant difference for oecrp+IPTG100")
+
+
+qthrs<-0.05
+fcthrs<-1
 
 sel.mets<-results %>%
   filter(Description %in% sel.comp) %>%
-  select(Contrast,Metabolite,FDR) %>%
-  spread(Contrast,FDR) %>%
-  filter(C_Metf<0.05  & CRP_Metf>0.05 & (oeCRP50<0.05 & oeCRP100<0.05) )%>%
+  select(Contrast,Metabolite,logFC,FDR) %>%
+  gather(Stat,Value,logFC,FDR) %>%
+  unite(CS,Contrast,Stat) %>%
+  spread(CS,Value) %>%
+  filter( (C_Metf_FDR<qthrs & abs(C_Metf_logFC)>fcthrs )  &
+            (oeCRP50_FDR<qthrs & abs(oeCRP50_logFC)>fcthrs )  &
+            (oeCRP100_FDR<qthrs & abs(oeCRP100_logFC)>fcthrs ) &
+            !(CRP_Metf_FDR<qthrs & abs(CRP_Metf_logFC)>fcthrs ) &
+            !(CGlu_Metf_FDR<qthrs & abs(CGlu_Metf_logFC)>fcthrs ) &
+            sign(C_Metf_logFC)==sign(oeCRP50_logFC) & sign(C_Metf_logFC)==sign(oeCRP100_logFC)) %>% 
   pull(Metabolite)
 
-sel.mets2<-results %>%
-  filter(Description %in% sel.comp) %>%
-  select(Contrast,Metabolite,logFC) %>%
-  spread(Contrast,logFC) %>%
-  filter(sign(C_Metf)==sign(oeCRP50) & sign(C_Metf)==sign(oeCRP100) ) %>%
-  pull(Metabolite)
 
-mets<-intersect(sel.mets2,sel.mets)
+
+# sel.mets2<-results %>%
+#   filter(Description %in% sel.comp) %>%
+#   select(Contrast,Metabolite,logFC) %>%
+#   spread(Contrast,logFC) %>%
+#   filter(sign(C_Metf)==sign(oeCRP50) & sign(C_Metf)==sign(oeCRP100) & abs(CGlu_Metf)>=fcthrs ) %>%
+#   #filter(abs(C_Metf)>=fcthrs & abs(oeCRP50)>=fcthrs & abs(oeCRP100)>=fcthrs & abs(CGlu_Metf)>=fcthrs ) %>%
+#   pull(Metabolite)
+#mets<-intersect(sel.mets2,sel.mets)
+
+mets<-sel.mets
+
+mets
+
+
 
 
 results %>%
-  filter(Contrast %in% c('C_Metf','CRP_Metf','oeCRP50','oeCRP100') ) %>%
+  #filter(Contrast %in% c('C_Metf','CRP_Metf','oeCRP50','oeCRP100') ) %>% # No Glucose
+  filter(Contrast %in% c('C_Metf','CRP_Metf','C_Glu','CGlu_Metf','oeCRP50','oeCRP100') ) %>% # No Glucose
   VolcanoPlot(mets)
 
-ggsave(file=paste(odir,'/Volcano_Publication_4_logFCcolor.pdf',sep = ''),
+#No Glucose
+# ggsave(file=paste(odir,'/Volcano_Publication_4_logFCcolor.pdf',sep = ''),
+#        width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+#Glucose
+ggsave(file=paste(odir,'/Volcano_Publication_4_logFCcolor_Glucose.pdf',sep = ''),
        width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-
-
-
+#mets,
 results %>%
-  filter(Contrast %in% c('C_Metf','CRP_Metf','oeCRP50','oeCRP100')) %>%
-  ggplot(aes(x=logFC,y=logFDR,color=Strain))+
-  geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-  geom_errorbarh(aes(xmin=NE,xmax=PE),alpha=erralpha,color=errcolor,height=0)+
-  geom_point()+
-  scale_y_continuous(breaks=seq(0,20,by=2))+
-  scale_x_continuous(breaks=seq(-10,10,by=1))+
-  geom_text_repel(aes(label=ifelse(Metabolite %in% mets  & FDR<0.05 & abs(logFC)>1,as.character(Metabolite),'')),size=2)+
-  facet_wrap(~Description,ncol = 2)+
-  ggtitle('Metformin & CRP')
+  filter(Contrast %in% c('C_Metf','CRP_Metf','C_Glu','CGlu_Metf','oeCRP50','oeCRP100') & Metabolite %in% c('Ornithine')) %>%
+  View
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_Metformin_and_CRP.pdf',sep = ''),
-             width=12,height=8,useDingbats=FALSE)
+
+
+# results %>%
+#   filter(Contrast %in% c('C_Metf','CRP_Metf','C_Glu','CGlu_Metf','oeCRP50','oeCRP100')) %>%
+#   ggplot(aes(x=logFC,y=logFDR,color=Strain))+
+#   geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
+#   geom_errorbarh(aes(xmin=NE,xmax=PE),alpha=erralpha,color=errcolor,height=0)+
+#   geom_point()+
+#   scale_y_continuous(breaks=seq(0,20,by=2))+
+#   scale_x_continuous(breaks=seq(-10,10,by=1))+
+#   geom_text_repel(aes(label=ifelse(Metabolite %in% mets  & FDR<0.05 & abs(logFC)>1,as.character(Metabolite),'')),size=2)+
+#   facet_wrap(~Description,ncol = 2)+
+#   ggtitle('Metformin & CRP')
+# 
+# dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_Metformin_and_CRP.pdf',sep = ''),
+#              width=12,height=8,useDingbats=FALSE)
+
+
+
+
+
+
+
+
 
 
 #Venn diagram
@@ -826,7 +865,7 @@ dev.off()#
 
 
 
-sel.comp<-c("Treatment effect on OP50-C","Treatment effect on crp","Mutant difference for oecrp+IPTG50","Mutant difference for oecrp+IPTG100")
+sel.comp<-c("Treatment effect on OP50-C","Treatment effect on crp",'Treatment effect on OP50-C + Glucose',"Mutant difference for oecrp+IPTG50","Mutant difference for oecrp+IPTG100")
 
 
 #Filter metabolites for clean heatmap
@@ -853,9 +892,6 @@ clrbrks<-seq(-amp,amp,by=2)
 clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
 
 
-
-
-
 results %>%
   filter(Description %in% sel.comp & Metabolite %in% mets) %>%
   mutate(Description=factor(Description,levels=sel.comp,labels=sel.comp)) %>%
@@ -870,8 +906,10 @@ results %>%
   theme(axis.text.x = element_text(angle=45))
 
 
-ggsave(file=paste0(odir,'/Comparison_Heatmap_Treatments_and_oeCRP50-100_stat_filter_conservative.pdf'),
+ggsave(file=paste0(odir,'/Comparison_Heatmap_Treatments_and_Glucose_oeCRP50-100_stat_filter_conservative2.pdf'),
        width=55,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
 
 
 #Generate table
@@ -894,6 +932,8 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_an
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_Heatmap_Treatments_and_oeCRP50_stat_filter.pdf',sep = ''),
              width=4,height=8,useDingbats=FALSE)
+
+
 
 
 #For pathways

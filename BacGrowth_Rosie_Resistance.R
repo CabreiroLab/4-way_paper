@@ -116,6 +116,7 @@ datats.sum<-data_ts %>%
   summarise(OD_Mean=mean(OD),
             OD_SD=sd(OD))
 
+
 ggplot(datats.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
   geom_line()+
   geom_ribbon(aes(ymin=OD_Mean-OD_SD,
@@ -129,6 +130,25 @@ ggplot(datats.sum,aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
 
 ggsave(device=cairo_pdf,width=55,height=41,units='mm',scale=2, family="Arial",
              file=paste0(odir,"/Growth_Summary.pdf"))
+
+
+
+datats.sum %>%
+  filter(Strain %in% c('OP50-C','OP50-MR')) %>%
+  ggplot(aes(x=Time_h,y=OD_Mean,color=Metformin_mM,fill=Metformin_mM))+
+  geom_line()+
+  geom_ribbon(aes(ymin=OD_Mean-OD_SD,
+                  ymax=OD_Mean+OD_SD),alpha=0.5,color=NA)+
+  xlab('Time, h')+
+  ylab('OD')+
+  scale_colour_manual(name = Metlab,values = Metcols)+
+  scale_fill_manual(name = Metlab,values = Metcols)+
+  scale_x_continuous(breaks=seq(0,18,by=6))+
+  facet_wrap(~Strain)
+
+ggsave(device=cairo_pdf,width=110,height=41,units='mm',scale=2, family="Arial",
+       file=paste0(odir,"/Growth_Summary_C_MR.pdf"))
+
 
 
 PlotBox<-function(data,yvar,ytitle,title) {

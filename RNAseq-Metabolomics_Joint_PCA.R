@@ -93,8 +93,6 @@ glimpse(pcadata)
 
 
 
-
-
 ellipses<-pcadata %>%
   group_by(Dataset,Group,Strain,Metformin_mM) %>%
   do(getellipse(.$PC1,.$PC2,sc = 1))
@@ -108,12 +106,16 @@ PCAplot<-function(data,ellipses) {
   ggplot(aes(x=PC1,y=PC2))+
     geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),colour=Strain,linetype=Metformin_mM),size=1)+ 
     geom_point(aes(fill= ifelse(Metformin_mM==0,as.character(Strain), NA ), colour=Strain ),size=3,stroke=1,shape=21)+
-    scale_linetype_manual("Metformin, mM",values=c("0"=1,"50"=2))+
     scale_fill_manual(name = STlab,values =STcols,na.value=NA,guide=FALSE)+
-    scale_color_manual(name = STlab,values =STcols)+
+    scale_color_manual(name = STlab,values =STcols,guide=guide_legend(order=1))+
+    scale_linetype_manual("Metformin,\nmM",values=c("0"=1,"50"=2),
+                          guide=guide_legend(override.aes = list(shape=c(21,21),
+                                                                 size=1,
+                                                                 linetype=c(1,3),
+                                                                 colour="black",
+                                                                 fill=c(1,NA)) ))+
     scale_x_continuous(breaks=seq(-20,20,by=1))+
     scale_y_continuous(breaks=seq(-20,20,by=1))+
-    guides(linetype = guide_legend(override.aes = list(shape=c(21,21),size=1,linetype=c(1,3),colour="black",fill=c(1,NA))))+
     theme(panel.grid.major = element_blank(),
           panel.grid.minor = element_blank())+
     facet_grid(.~Dataset,scales = "free")+
@@ -167,6 +169,8 @@ FA<-pcadata %>%
 
 RNAseql<-RNAseq+
   theme(legend.position="right")
+
+RNAseql
 
 ggsave(RNAseql,file=paste0(odir,"/RNAseq_PCA_legend.pdf"),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")

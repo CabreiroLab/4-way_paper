@@ -10,10 +10,13 @@ library(plot3D)
 library(rgl)
 library(pca3d)
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-theme_set(theme_Publication())
+theme_set(theme_PN(base_size = 12))
+scale_colour_discrete <- ggthemes::scale_colour_tableau
+scale_fill_discrete <- ggthemes::scale_fill_tableau
+
 
 setwd("~/Dropbox/Projects/2015-Metformin/GFP_reporters")
 
@@ -327,6 +330,9 @@ ellipses<-PCAres$Ellipses
 pcadata<-PCAres$pcadata
 pcaloadings<-PCAres$Loadings
 pcashape=PCAres$pcashape
+
+
+
 
 
 plot(HC, labels=samples,
@@ -693,8 +699,6 @@ subset(tfresults.t,TF=='CRP' & Contrast %in% selcont)
 head(tfresults.t)
 
 
-
-
 tfresults.m<-melt(tfresults.t,id.vars=c('TF','Contrast'),measure.vars=c('logFC','p.value','SE','t.value','PE','NE','FDR','logFDR'),variable.name = 'Stat',value.name = 'Value')
 tfresults.m
 
@@ -721,8 +725,6 @@ rownames(tfhdata)<-tfhdata$TF
 
 nstep<-10
 bgg <- colorRampPalette(c("blue4", "gray90", "red4"))(n = nstep)
-
-
 
 
 dim(tfhdata)
@@ -1168,6 +1170,35 @@ for (x in maincomps){
   print(volcano)
   dev.off()
 }
+
+
+
+
+#Volcano plots
+cnames<-c('SM-S'='OP50-C treatment','RM-R'='OP50-MR treatment','R-S'='Strain difference','SM-S-(RM-R)'='Longevity effect')
+
+
+results <- read_csv('All_results.csv') %>%
+  group_by(Contrast) %>%
+  arrange(desc(logFDR)) %>%
+  mutate(Name=ifelse(row_number()<=10 & FDR<0.05,Promoter,NA ))
+
+
+unique(data$Comparison)
+
+results %>%
+  filter(Contrast %in% c('PM-PC','PGM-PGC_adj','PGC-PC')) %>%
+  ggplot(aes(x=logFC,y=logFDR))+
+  geom_hline(yintercept = -log10(0.05),color='red4',alpha=0.5)+
+  geom_point(size=1,color='gray50' )+
+  geom_text_repel(aes(label=Name),color='red2')+
+  ylab('-log10(FDR)')+
+  facet_wrap(~Description,ncol = 3)
+
+ggsave(file=paste0(odir,'/UAL_Volcano_plot_clean.pdf'),
+       width=120,height=60,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
 
 
 
