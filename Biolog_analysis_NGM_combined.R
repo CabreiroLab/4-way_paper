@@ -73,6 +73,7 @@ info<-read_csv('~/Scripts/Growth_analysis/Biolog_metabolites.csv') %>%
 
 PM1PM2<-subset(info,Plate %in% c('PM1','PM2A'))
 
+
 #Pick data to show
 
 logFDRbreaks<-c(-1,1.3,2,3,14)
@@ -83,7 +84,7 @@ logFDRcols<-c("gray40", "red4", "red3",'red')
 
 
 #Carboxylic acids to remove
-coxy<-c('Itaconic Acid','Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')
+coxy<-c('Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')#'Itaconic Acid'
 
 
 selmets<-info %>%
@@ -158,6 +159,10 @@ selmets<-info %>%
 results.eco<-read_csv('Summary/Ecoli_results.csv')  %>%
   select(Description:Contrast_type,Measure,MetaboliteU,Index,logFC:NE,-c(pStars,FDRStars,t.value,p.value))
 
+
+results.eco %>%
+  filter(Index=='PM2A-E11')
+
 metorder<-results.eco %>%
   filter(MetaboliteU %in% selmets$MetaboliteU & Contrast=="T-C" & Measure=="G") %>%
   arrange(logFC) %>%
@@ -229,6 +234,10 @@ results.ecocel %>%
 results.ecocel %>%
   filter(Measure %in% c('G',"F") & Contrast=="T-C" & Organism=="E. coli") %>%
   arrange(desc(logFC))
+
+
+results.ecocel %>% 
+  filter(Metabolite=='Itaconic Acid')
 
 
 
@@ -366,10 +375,12 @@ results.ecocel %>%
   filter(OMC %in% c("Ec_G_T-C","Ce_F_T-C")) %>%
   TallPlot+
   facet_grid(~Organism)+
-  theme( axis.text.y=element_blank())
+  xlab("E. coli growth rescue/C. elegans phenotype rescue, logFC")+
+  theme( axis.text.y=element_blank(),
+         legend.position = "top")
 
 ggsave(file=paste0(odir,"/EcoliCelegans_logFC_tall_Treatment_tiny.pdf"),
-             width=60,height=60,units='mm',scale=2,device=cairo_pdf,family="Arial")
+             width=55,height=80,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 ggsave(file=paste0(odir,"/EcoliCelegans_logFC_tall_Treatment_tiny_7cm.pdf"),
        width=60,height=70,units='mm',scale=2,device=cairo_pdf,family="Arial")
@@ -441,7 +452,17 @@ gradcols<-c('blue4','blue','gray80','red','red4')
 
 
 
-showmets<-c("D-Arabinose","L-Arabinose","Acetoacetic Acid","D-Ribose","Glycerol","alpha-D-Glucose","Phosphono Acetic Acid","")
+showmets<-c("D-Arabinose","L-Arabinose","Acetoacetic Acid","D-Ribose","Glycerol","alpha-D-Glucose","Itaconic Acid","")
+
+
+showmets<-c('alpha-D-Glucose',
+  'D-Ribose',
+  'D-Arabinose',
+  'Glycerol',
+  'L-Serine',
+  'Adenosine',
+  'Acetoacetic Acid',
+  'Itaconic Acid')
 
 ecocelmulti %>%
   filter(x_OMC=="Ec_G_C",
@@ -495,7 +516,7 @@ metselection<-c('alpha-D-Glucose',
            'L-Proline',
            'Adenosine',
            'Acetoacetic Acid',
-           'Phosphono Acetic Acid')
+           'Itaconic Acid')
 
 
 
@@ -517,6 +538,13 @@ gsum<-ecocelmulti2 %>%
          y_OMC=="Ce_F_T-C") %>%
   group_by(x_OMC) %>%
   do(broom::tidy(lm(y_logFC~x_logFC,data=.)))
+
+rsum<-ecocelmulti2 %>%
+  filter(x_OMC %in% c("Ec_G_C","Ec_G_T",'Ec_G_T-C'),
+         y_OMC=="Ce_F_T-C") %>%
+  group_by(x_OMC) %>%
+  do(broom::glance(lm(y_logFC~x_logFC,data=.)))
+
 
 
 TCr<-resultTC$r.squared
@@ -799,7 +827,16 @@ gsum<-ecocelmulti2 %>%
   group_by(x_OMC) %>%
   do(broom::tidy(lm(y_logFC~x_logFC,data=.)))
 
+rsum<-ecocelmulti2 %>%
+  filter(x_OMC %in% c("Ec_G_C","Ec_G_T",'Ec_G_T-C'),
+         y_OMC=="Ce_F_T-C") %>%
+  group_by(x_OMC) %>%
+  do(broom::glance(lm(y_logFC~x_logFC,data=.)))
 
+
+
+gsum
+rsum
 
 Cr<-resultC$r.squared
 Ci<-gsum[gsum$x_OMC=='Ec_G_C' & gsum$term=='(Intercept)',]$estimate
@@ -816,7 +853,7 @@ ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_C",
          y_OMC=="Ce_F_T-C") %>%
   ggplot(aes(x=x_logFC,y=y_logFC) )+
-  geom_rug(size=1,alpha=0.2,color="gray20")+
+  #geom_rug(size=1,alpha=0.2,color="gray20")+
   geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_abline(aes(slope=Cs,
@@ -842,7 +879,7 @@ ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_T",
          y_OMC=="Ce_F_T-C") %>%
   ggplot(aes(x=x_logFC,y=y_logFC) )+
-  geom_rug(size=1,alpha=0.2,color="gray20")+
+  #geom_rug(size=1,alpha=0.2,color="gray20")+
   geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_abline(aes(slope=Ts,
@@ -868,7 +905,7 @@ ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_T-C",
          y_OMC=="Ce_F_T-C") %>%
   ggplot(aes(x=x_logFC,y=y_logFC) )+
-  geom_rug(size=1,alpha=0.2,color="gray20")+
+  #geom_rug(size=1,alpha=0.2,color="gray20")+
   geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_vline(xintercept = 1.125,color='blue',alpha=0.5,linetype='longdash')+
   geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
@@ -940,10 +977,9 @@ mlevels<-c('Negative Control_C',
            'D-Arabinose',
            'Glycerol',
               'L-Serine',
-              
            'Adenosine',
               'Acetoacetic Acid',
-           'Phosphono Acetic Acid')
+           'Itaconic Acid')
 
 mlabels<-c('NGM',
            'D-Glucose',
@@ -951,10 +987,9 @@ mlabels<-c('NGM',
            'D-Arabinose',
            'Glycerol',
            'L-Serine',
-
            'Adenosine',
            'Acetoacetate',
-           'Phosphono Acetate')
+           'Itaconate')
 
 
 indxsel<-info %>%
@@ -1029,8 +1064,8 @@ data.Isel$Metformin_mM
 
 res.sel %>%
   ggplot(aes(color=Metformin_mM))+
-  geom_vline(aes(xintercept=res.sel[res.sel$Index=='PM1-A1','Raw_Q90_Mean']),color='blue4',linetype='longdash',alpha=0.5)+
-  geom_vline(aes(xintercept=res.sel[res.sel$Index=='Controls-A1','Raw_Q90_Mean']),color='red4',linetype='longdash',alpha=0.5)+
+  geom_vline(aes(xintercept=res.sel[res.sel$Index=='PM1-A1',]$Raw_Q90_Mean),color='blue4',linetype='longdash',alpha=0.5)+
+  geom_vline(aes(xintercept=res.sel[res.sel$Index=='Controls-A1',]$Raw_Q90_Mean),color='red4',linetype='longdash',alpha=0.5)+
   geom_rect(aes(xmin=Raw_Q90_Mean-Raw_Q90_SE,xmax=Raw_Q90_Mean+Raw_Q90_SE,fill=Metformin_mM),ymin=-Inf,ymax=Inf,alpha=0.2,color=NA)+
   geom_vline(aes(xintercept=Raw_Q90_Mean,color=Metformin_mM))+
   geom_ribbon(data=data.Isel,aes(x=LogBrightness_num,ymin=(Mean-SD)*100,ymax=(Mean+SD)*100,fill=Metformin_mM),alpha=0.5,color=NA)+
@@ -1078,13 +1113,17 @@ res.Ecsel<-read_csv(paste0(odir,"/Ecoli_unfiltered_results.csv")) %>%
 res.Ecsel %>%
   filter(Metabolite=='Negative Control')
 
+res.Ecsel
 
+res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='C',]$logFC
+
+res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='C',]$logFC
 
 
 res.Ecsel %>%
   ggplot(aes(x=MetaboliteU,y=logFC,color=Metformin_mM))+
-  geom_hline(aes(yintercept=res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='C','logFC']),color='red4',linetype='longdash',alpha=0.5)+
-  geom_hline(aes(yintercept=res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='T','logFC']),color='blue4',linetype='longdash',alpha=0.5)+
+  geom_hline(aes(yintercept=res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='C',]$logFC),color='red4',linetype='longdash',alpha=0.5)+
+  geom_hline(aes(yintercept=res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='T',]$logFC),color='blue4',linetype='longdash',alpha=0.5)+
   geom_errorbar(aes(ymin=NE,ymax=PE),position = position_dodge(width = dwidth),width=0.25)+
   geom_point(position = position_dodge(width = dwidth),size=2)+
   scale_colour_manual(name = Metlab,values =Metcols)+
@@ -1107,8 +1146,8 @@ res.sel.adj<-res.sel %>%
 dwidth<-0.5
 res.sel.adj %>%
   ggplot(aes(x=MetaboliteU,y=Raw_Q90_Mean,color=Metformin_mM))+
-  geom_hline(aes(yintercept=res.sel.adj[res.sel.adj$Index=='PM1-A1','Raw_Q90_Mean']),color='blue4',linetype='longdash',alpha=0.5)+
-  geom_hline(aes(yintercept=res.sel.adj[res.sel.adj$Index=='Controls-A1','Raw_Q90_Mean']),color='red4',linetype='longdash',alpha=0.5)+
+  geom_hline(aes(yintercept=res.sel.adj[res.sel.adj$Index=='PM1-A1',]$Raw_Q90_Mean),color='blue4',linetype='longdash',alpha=0.5)+
+  geom_hline(aes(yintercept=res.sel.adj[res.sel.adj$Index=='Controls-A1',]$Raw_Q90_Mean),color='red4',linetype='longdash',alpha=0.5)+
  
   geom_errorbar(aes(ymin=Raw_Q90_Mean-Raw_Q90_SE,ymax=Raw_Q90_Mean+Raw_Q90_SE),position = position_dodge(width = dwidth),width=0.25)+
   geom_point(position = position_dodge(width = dwidth),size=2)+

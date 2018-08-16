@@ -499,12 +499,14 @@ comparisons<-c("Treatment effect on OP50","Treatment effect on OP50-MR","Treatme
 
 
 
-fig2conts<-c('C_T-C_C','MR_T-MR_C','nhr49_T-nhr49_C','MR_C-C_C','nhr49_C-C_C')
-
-fig6conts<-c('C_T-C_C','crp_T-crp_C')
+fig2conts<-c('C_T-C_C','MR_T-MR_C','MR_T-MR_C-(C_T-C_C)')
 
 
-contsel<-fig6conts
+
+fig6conts<-c('C_T-C_C','crp_T-crp_C','crp_T-crp_C-(C_T-C_C)')
+
+
+contsel<-fig2conts
 descsel<-contrasts.desc[contrasts.desc$Contrast %in% contsel,"Description"] %>% as.character
 
 
@@ -565,6 +567,36 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig2_combined
 
 
 
+results.joint$Type
+
+results.joint %>%
+  filter(Contrast %in% contsel) %>%
+  group_by(Metabolite) %>%
+  filter(any(FDR<0.05)) %>%
+  ungroup %>%
+  mutate(Description=factor(Description,levels=rev(descsel) )) %>%
+  ggplot(aes(x=Metabolite,y=Description))+
+  geom_tile(aes(fill=logFC))+
+  geom_text(aes(label=as.character(FDRStars)),angle = 90,size=5,vjust=0.75)+
+  scale_fill_gradientn(colours = clrscale,
+                       breaks=clrbrks,limits=c(-amp,amp))+
+  xlab("Metabolite")+
+  theme_Heatmap()+
+  theme(axis.text.x =  element_text(angle = 45, hjust = 1),
+        axis.title.y = element_blank())+
+  facet_grid(.~Type,space='free_x',scale='free_x')
+
+
+
+
+ggsave(file=paste0(odir,'/Comparison_heatmap_Fig2_AA_FA_horizontal.pdf'),
+       width=170,height=45,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
+
 
 results.joint %>%
   filter(Contrast %in% contsel) %>%
@@ -590,6 +622,30 @@ ggsave(file=paste0(odir,'/Comparison_heatmap_Fig6_combined_horizontal.pdf'),
 
 
 
+
+results.joint$Type
+
+results.joint %>%
+  filter(Contrast %in% contsel & Type=='Fatty acids') %>%
+  group_by(Metabolite) %>%
+  filter(any(FDR<0.05)) %>%
+  ungroup %>%
+  mutate(Description=factor(Description,levels=rev(descsel) )) %>%
+  ggplot(aes(x=Metabolite,y=Description))+
+  geom_tile(aes(fill=logFC))+
+  geom_text(aes(label=as.character(FDRStars)),angle = 90,size=5,vjust=0.75)+
+  scale_fill_gradientn(colours = clrscale,
+                       breaks=clrbrks,limits=c(-amp,amp))+
+  xlab("Metabolite")+
+  theme_Heatmap()+
+  theme(axis.text.x =  element_text(angle = 45, hjust = 1),
+        axis.title.y = element_blank())
+
+
+
+
+ggsave(file=paste0(odir,'/Comparison_heatmap_Fig5_FA_horizontal.pdf'),
+       width=110,height=40,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 

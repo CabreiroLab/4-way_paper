@@ -193,24 +193,31 @@ stat %>%
   PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )
 
 
-Compplots<-stat %>%
+stat %>%
   filter(Normalisation=="Norm_M" & Measure!="AUC") %>%
   group_by(Measure) %>%
-  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) )
+  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) ) %>%
+  mutate(file=paste0(odir,"/Growth_comparison_vs_Control_condensed_",Measure,".pdf")) %>%
+  do(ggsave(.$file,.$plot,width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial") )
 
-Compwrap<-stat %>%
+
+
+stat %>%
   filter(Normalisation=="Norm_M" & Measure!="AUC") %>%
   group_by(Measure) %>%
-  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Media))
+  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) )+theme(legend.position = "top") ) %>%
+  mutate(file=paste0(odir,"/Growth_comparison_vs_Control_condensed_",Measure,"_squashed.pdf")) %>%
+  do(ggsave(.$file,.$plot,width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial") )
 
 
-map2(paste0(odir,"/Growth_comparison_vs_Control_condensed_",as.character(Compplots$Measure),".pdf"),
-     Compplots$plot,
-     width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial", ggsave)
 
 
-map2(paste0(odir,"/Growth_comparison_vs_Control_",as.character(Compwrap$Measure),".pdf"),
-     Compwrap$plot,
-     width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial", ggsave)
+stat %>%
+  filter(Normalisation=="Norm_M" & Measure!="AUC") %>%
+  group_by(Measure) %>%
+  do(plot=PlotComp(.,stat,unique(as.character(.$Measure)),unique(as.character(.$MeasShort)) ) + facet_wrap(~Media)) %>%
+  mutate(file=paste0(odir,"/Growth_comparison_vs_Control_",Measure,".pdf")) %>%
+  do(ggsave(.$file,.$plot,width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial") )
+
 
 

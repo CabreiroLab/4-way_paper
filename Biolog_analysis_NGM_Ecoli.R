@@ -165,7 +165,7 @@ contrasts.desc
 
 
 #Carboxylic acids to remove
-coxy<-c('Itaconic Acid','Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')
+coxy<-c('Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')
 
 selmets<-info %>%
   filter(!(Plate %in% c('PM3B','PM4A') &
@@ -185,8 +185,8 @@ results.all<-data.nc %>%
 
 
 #Unfiltered results
-results.all$results %>%
-  write.csv(paste0(odir,'/Ecoli_unfiltered_results.csv'),row.names = FALSE)
+# results.all$results %>%
+#   write.csv(paste0(odir,'/Ecoli_unfiltered_results.csv'),row.names = FALSE)
 
 
 #Separate results

@@ -27,6 +27,9 @@ strains<-c('OP50-C','OP50-MR','crp','cra')
 Sstrains<-c('OP50-C','OP50-C-Glu','OP50-MR','crp','cra')
 
 
+
+
+
 data <- read_csv('All_raw_data_updated.csv') %>%
   filter(Type %in% c('CRP','RNAseq')) %>%
   mutate_at(c('Type','Gene','Strain','Metformin_mM','Supplement','SGroup','Condition','ID','Replicate'),as.factor) %>%
@@ -231,7 +234,6 @@ write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full_updated.csv'
 #Generate table for heatmap
 
 
-
 heatsum<-results %>%
   filter(Contrast_type %in% c('Treatment','Interaction' ) ) %>%
   select(Description,Gene,logFC) %>%
@@ -324,8 +326,13 @@ RNAresults<-results %>%
   select(Gene, Contrast, Description,logFC,FDR,pStars) %>%
   rename(Stars=pStars) %>%
   mutate(Type='Fluorescence') %>%
-  rbind(RNAseq.new)
+  rbind(RNAseq.new) %>%
+  select(Type,everything())
 
+
+
+RNAresults %>%
+  write_csv(paste0(odir,'/Results_with_RNAseq.csv'))
 
 
 
