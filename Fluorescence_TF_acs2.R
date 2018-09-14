@@ -355,8 +355,9 @@ names(Metcols2) <- c("50","0")
 Metlab2<-'Metformin,\nmM'
 
 
-#quartz()
+quartz()
 data %>%
+  filter(Gene %in% c('OP50-C','crp','cra','argR','ntrC')) %>%
   mutate(Metformin_mM=factor(Metformin_mM,levels=c(50,0))) %>%
   ggplot+
   aes(x=Gene,y=NormAbs,color=Metformin_mM)+
@@ -371,17 +372,17 @@ data %>%
   scale_fill_manual(name = Metlab2,values =Metcols2)+
   ylab('Mean fluorescence per worm, a.u.')+
   xlab('Gene')+
-  #geom_text(data=showstats %>% filter(Contrast_type=="Gene" & Metformin_mM=="50" ) ,aes(label=pStars,y=2^7.25),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
-  #geom_text(data=showstats %>% filter(Contrast_type=="Interaction"),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,color="green4",nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)+
-  #geom_text(data=showstats %>% filter(Contrast_type=="Gene"& Metformin_mM=="0") ,aes(label=pStars,y=2^4.75),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
+  # geom_text(data=showstats %>% filter(Contrast_type=="Gene" & Metformin_mM=="50" ) ,aes(label=pStars,y=2^7.25),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
+  # geom_text(data=showstats %>% filter(Contrast_type=="Interaction"),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,color="green4",nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)+
+  # geom_text(data=showstats %>% filter(Contrast_type=="Gene"& Metformin_mM=="0") ,aes(label=pStars,y=2^4.75),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
   #theme(legend.position="top")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         strip.text.y = element_blank())+
   facet_grid(Metformin_mM~.,scales = "free_y")
 
 
-ggsave(file=paste(odir,'/Fluorescence_logScale2_axisbreak.pdf',sep = ''),
-       width=60,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+ggsave(file=paste(odir,'/Fluorescence_logScale2_axisbreak_Thesis.pdf',sep = ''),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 

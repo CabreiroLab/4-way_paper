@@ -452,7 +452,7 @@ gradcols<-c('blue4','blue','gray80','red','red4')
 
 
 
-showmets<-c("D-Arabinose","L-Arabinose","Acetoacetic Acid","D-Ribose","Glycerol","alpha-D-Glucose","Itaconic Acid","")
+#showmets<-c("D-Arabinose","L-Arabinose","Acetoacetic Acid","D-Ribose","Glycerol","alpha-D-Glucose","Itaconic Acid","")
 
 
 showmets<-c('alpha-D-Glucose',
@@ -490,8 +490,10 @@ ecocelmulti %>%
         panel.grid.minor = element_blank(),
         legend.position = "none")
 
-ggsave(file=paste0(odir,"/Scatter_Control-Treatment_Complete_Selmets.pdf"),
-             width=70,height=70,units='mm',scale=2,device=cairo_pdf,family="Arial")
+ggsave(file=paste0(odir,"/Scatter_Control-Treatment_Complete_Selmets_large.pdf"),
+             width=110,height=110,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
 
 
 #C elegans, E coli comparison - pole 
@@ -559,9 +561,9 @@ ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_T-C", 
          y_OMC=="Ce_F_T-C") %>%
   ggplot(aes(x=x_logFC,y=y_logFC,color=pole(-y_logFC,x_logFC)))+
-  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_vline(xintercept = 1.125,color='blue',alpha=0.5,linetype='longdash')+
+  geom_vline(xintercept = 0,color='gray70',alpha=0.5)+
+  geom_hline(yintercept = 0,color='gray70',alpha=0.5)+
+  geom_vline(xintercept = 1.125,color='green4',linetype='longdash')+
   geom_abline(aes(slope=TCs,
                   intercept=TCi),
               color='red',size=0.5)+
@@ -572,10 +574,7 @@ ecocelmulti2 %>%
   scale_y_continuous(breaks=seq(-10,10,by=1))+
   xlab('Growth rescue in E. coli, logFC')+
   ylab('Phenotype rescue in C. elegans, logFC')+
-  geom_text_repel(aes(label=ifelse(y_FDR<0.05 &
-                                     x_FDR<0.05 &
-                                     !(x_logFC>0 & y_logFC>0) |
-                                     MetaboliteU %in% metselection, as.character(MetaboliteU),'')),
+  geom_text_repel(aes(label=ifelse(MetaboliteU %in% metselection, as.character(MetaboliteU),'')),
                   size=lblsize,nudge_y = 0.3,force=1,
                   segment.colour=errcolor,
                   segment.alpha =segalpha)+
@@ -585,13 +584,13 @@ ecocelmulti2 %>%
   labs(color='Consistency\nof effect')+
   coord_cartesian(xlim=c(-2.5,2.5),ylim = c(-1.5,2))+
   #ggtitle(paste('C. elegans and E. coli phenotype rescue in metformin treatment by metabolites: ',grp,sep='') )+
-  annotate('text',x = -1, y =-1.5, label = lm_eqn(fitTC)$Full, parse = TRUE,color ='red',size=4)+
+  #annotate('text',x = -1, y =-1.5, label = lm_eqn(fitTC)$Full, parse = TRUE,color ='red',size=4)+
   theme(panel.grid.major = element_blank(),
         panel.grid.minor = element_blank())
 
 
 
-ggsave(file=paste0(odir,"/Celegans_Ecoli_effect_correlation_Complete_BothSignificant.pdf"),
+ggsave(file=paste0(odir,"/Celegans_Ecoli_effect_correlation_Complete_Selection.pdf"),
        width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
@@ -853,7 +852,7 @@ ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_C",
          y_OMC=="Ce_F_T-C") %>%
   ggplot(aes(x=x_logFC,y=y_logFC) )+
-  #geom_rug(size=1,alpha=0.2,color="gray20")+
+  geom_rug(size=1,alpha=0.2,color="gray20")+
   geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_abline(aes(slope=Cs,
@@ -870,7 +869,7 @@ ecocelmulti2 %>%
   coord_cartesian(xlim=c(-3,4),ylim = c(-2,2))
 
 
-ggsave(file=paste0(odir,"/Correlations_CeF_EcC.pdf"),
+ggsave(file=paste0(odir,"/Correlations_CeF_EcC_rug.pdf"),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
@@ -879,7 +878,7 @@ ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_T",
          y_OMC=="Ce_F_T-C") %>%
   ggplot(aes(x=x_logFC,y=y_logFC) )+
-  #geom_rug(size=1,alpha=0.2,color="gray20")+
+  geom_rug(size=1,alpha=0.2,color="gray20")+
   geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
   geom_abline(aes(slope=Ts,
@@ -896,7 +895,7 @@ ecocelmulti2 %>%
   #annotate('text',x = -1, y =-2, label = lm_eqn(fitT)$Full, parse = TRUE,color ='red',size=4)+
   coord_cartesian(xlim=c(-3,4),ylim = c(-2,2))
 
-ggsave(file=paste0(odir,"/Correlations_CeF_EcT.pdf"),
+ggsave(file=paste0(odir,"/Correlations_CeF_EcT_rug.pdf"),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
@@ -944,6 +943,9 @@ tsum<-ectimem %>%
   summarise(Mean=mean(OD),SD=sd(OD),SE=SD/sqrt(length(OD))) %>%
   left_join(info) %>%
   mutate(Organism='E. coli')
+
+
+
 
 
 results.in<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv') %>%
@@ -995,6 +997,21 @@ mlabels<-c('NGM',
 indxsel<-info %>%
   filter(MetaboliteU %in% mlevels) %>%
   pull(Index)
+
+indxsel
+
+
+info %>%
+  filter(MetaboliteU %in% mlevels) %>%
+  mutate(Col=str_remove_all(Well,'[:alpha:]') %>% as.numeric,
+         Row=str_remove_all(Well,'[:digit:]'),
+         Row=factor(Row,levels=LETTERS[1:8]),
+         N=Col+(as.numeric(Row)-1)*12,
+         IIndex=paste(Plate,formatC(N, width=3, flag="0"), sep="_")) %>%
+  pull(IIndex)
+           
+
+
 
 indxsel<-c(indxsel,'Controls-A1')
 
@@ -1095,9 +1112,9 @@ ggsave(file=paste(odir,"/Summary_Celegans_brightness_distribution_new.pdf",sep='
 res.Ecsel<-read_csv(paste0(odir,"/Ecoli_unfiltered_results.csv")) %>%
   filter(Contrast %in% c("C","T")  & Measure=="G")  %>%
   # filter(Metabolite=="Negative Control") %>% 
-  group_by(Group) %>%
+  group_by(Group,Plate) %>%
   mutate(logFC=ifelse(Metabolite=="Negative Control",logFC-logFC[Metabolite=="Negative Control" & Contrast=='C'],logFC)) %>%
-  group_by(Contrast,Group) %>%
+  group_by(Contrast,Group,Plate) %>%
   mutate(logFC=ifelse(Metabolite!="Negative Control",logFC+logFC[Metabolite=="Negative Control"],logFC),
          NE=logFC-SE,
          PE=logFC+SE ) %>%
@@ -1181,6 +1198,7 @@ reflines<-data.frame(Organism=c("E. coli","E. coli","C. elegans","C. elegans"),
 
 
 
+  
 
 colnames(res.Ecsel)
 

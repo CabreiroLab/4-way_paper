@@ -167,15 +167,6 @@ FA<-pcadata %>%
   scale_y_continuous(breaks=seq(-20,20,by=2))
 
 
-RNAseql<-RNAseq+
-  theme(legend.position="right")
-
-RNAseql
-
-ggsave(RNAseql,file=paste0(odir,"/RNAseq_PCA_legend.pdf"),
-       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
 
 pcas<-grid.arrange(RNAseq,AA,FA,ncol=3)
 pcas
@@ -184,3 +175,39 @@ pcas
 
 ggsave(pcas,file=paste0(odir,"/Joint_PCA_withaxis.pdf"),
              width=115,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
+
+PCAplot_clean<-function(data,ellipses) {
+  data %>%
+    ggplot(aes(x=PC1,y=PC2))+
+    geom_path(data=ellipses, aes(x=x, y=y,group=interaction(Group),colour=Strain,linetype=Metformin_mM),size=1)+ 
+    geom_point(aes(fill= ifelse(Metformin_mM==0,as.character(Strain), NA ), colour=Strain ),size=3,stroke=1,shape=21)+
+    scale_fill_manual(name = STlab,values =STcols,na.value=NA,guide=FALSE)+
+    scale_color_manual(name = STlab,values =STcols,guide=guide_legend(order=1))+
+    scale_linetype_manual("Metformin,\nmM",values=c("0"=1,"50"=2),
+                          guide=guide_legend(override.aes = list(shape=c(21,21),
+                                                                 size=1,
+                                                                 linetype=c(1,3),
+                                                                 colour="black",
+                                                                 fill=c(1,NA)) ))+
+    scale_x_continuous(breaks=seq(-20,20,by=1))+
+    scale_y_continuous(breaks=seq(-20,20,by=1))+
+    theme(panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+}
+
+
+pcadata %>%
+  filter(Dataset=='RNAseq') %>%
+  PCAplot_clean(ellipses %>% filter(Dataset=='RNAseq'))+
+  xlab('Leading logFC dimension 1')+
+  ylab('Leading logFC dimension 2')
+
+ggsave(RNAseql,file=paste0(odir,"/RNAseq_PCA_legend_larger.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+

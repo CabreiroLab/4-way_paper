@@ -55,6 +55,66 @@ lmfill<-function(data,formula) {
 
 
 
+lmtests<-function(data,formula) {
+  
+  val<-formula %>% str_split("~") %>% unlist(.) %>% first()
+  facs<-formula %>% str_split("~") %>% unlist(.) %>% nth(2) %>% str_split("\\*") %>% unlist
+  fac1<-facs[1]
+  fac2<-facs[2]
+  
+  facregex<-paste(fac1,fac2,sep="|")
+  
+  groupings<-group_vars(data)
+  
+  #Effect of first factor
+  stat1<-data %>%
+    group_by_(.dots=c(groupings,fac2)) %>%
+    do(broom::tidy(lm(as.formula(paste(val,fac1,sep="~")),data=.)) ) %>%
+    ungroup %>%
+    filter(term!='(Intercept)') %>%
+    mutate(term=str_replace_all(term,facregex,""),
+           Contrast_type=fac1 )%>%
+    rename_(.dots=setNames("term",fac1))
+  
+  
+  #Effect of second factor
+  stat2<-data %>%
+    group_by_(.dots=c(groupings,fac1)) %>%
+    do(broom::tidy(lm(as.formula(paste(val,fac2,sep="~")),data=.)) ) %>%
+    ungroup %>%
+    filter(term!='(Intercept)') %>%
+    mutate(term=str_replace_all(term,facregex,""),
+           Contrast_type=fac2)%>%
+    rename_(.dots=setNames("term",fac2))
+  
+  #Effect of interaction
+  stat3<-data %>%
+    do(broom::tidy(lm(as.formula(formula),data=.)) ) %>%
+    ungroup %>%
+    filter(str_detect(term,":")) %>%
+    mutate(term=str_replace_all(term,facregex,""),
+           Contrast_type="Interaction")%>%
+    separate(term,c(fac1,fac2))
+  
+  stat<-stat1 %>%
+    rbind(stat2) %>%
+    rbind(stat3) %>%
+    rename(SE=std.error,
+           logFC=estimate) %>%
+    mutate(PE=logFC+SE,
+           NE=logFC-SE,
+           Prc=2^logFC*100,
+           PrcNE=2^NE*100,
+           PrcPE=2^PE*100,
+           pStars=pStars(p.value)) %>%
+    mutate_at(c(fac1,fac2,"Contrast_type"),as.factor) %>%
+    select(one_of(groupings),"Contrast_type",fac1,fac2,everything())
+  
+  return(stat)
+}
+
+
+
 
 #Calculate fill concentrations from supplement data
 met.TCAf<-met.TCA %>%
@@ -216,11 +276,100 @@ bioinfo <- met.sel %>%
 rownames(bioinfo)<-bioinfo$ID
 
 
+#Clean data
+metcomplete<-met.sel %>%
+  group_by(Metabolite) %>%
+  mutate(Filling_missing=any(is.na(Filled_conc))) %>%
+  ungroup %>%
+  filter(!Filling_missing)
+
+
+#PEP
+
+
+
+Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+names(Metcols) <- c("0","50")
+Metlab<-'Metformin,\nmM'
+
+
+Pepyr<-metcomplete %>%
+  filter(Metabolite %in% c('PEP','Pyruvic acid') & !is.na(Conc_log) & SGroup %in% c("OP50-C","OP50-C + Glucose","crp")) %>%
+  mutate(Energy=ifelse(Metabolite=='PEP','PEP','Pyr'),
+         Energy=factor(Energy,levels=c('Pyr','PEP'),
+                       labels=c('Pyr','PEP')),
+         SGroup=factor(SGroup,levels=c("OP50-C","OP50-C + Glucose","crp"),labels=c("OP50","OP50 + Glu","crp") ) )
+
+
+pepyr.stats<-Pepyr %>%
+  group_by(SGroup) %>%
+  lmtests('Conc_log~Energy*Metformin_mM') %>%
+  rename(Metabolite=Energy,Sample=SGroup)
+
+
+pepyr.stats %>%
+  filter(Contrast_type!='Metformin_mM') %>%
+  select(-Metabolite) %>%
+  write_csv(paste0(odir,"/PEP|Pyr_stats.csv"))
+
+hj<-0.8
+vj<-2
+nx<--0.5
+
+pepyr.stats %>%
+  filter(Contrast_type=='Energy') %>%
+  ggplot(aes(x=Sample,y=logFC,fill=Metformin_mM))+
+  geom_hline(yintercept = 0,color="gray40")+
+  geom_errorbar(aes(ymin=logFC-SE,ymax=logFC+SE),position = position_dodge(0.75),width = 0.2)+
+  geom_col(position = "dodge",width=0.75)+
+  scale_y_continuous(breaks=seq(-10,10,by=1))+
+  scale_fill_manual(name = Metlab,values =Metcols)+
+  scale_color_manual(name = Metlab,values =Metcols)+
+  geom_text(data=filter(pepyr.stats,Contrast_type=="Energy"),aes(label=pStars,y=3.5,x=Sample,color=Metformin_mM),size=5,show.legend = FALSE, position = position_dodge(0.75))+
+  geom_text(data=filter(pepyr.stats,Contrast_type=="Interaction"),aes(label=pStars,y=4,x=Sample),show.legend = FALSE,size=5,color="green4",position = position_dodge(0.75))+
+  xlab("Conditions")+
+  ylab('PEP/Pyr, logFC')
+
+
+ggsave(file=paste0(odir,"/PEP|Pyr_ratio.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+metcomplete$Group
+
+Pepyroe<-metcomplete %>%
+  filter(Metabolite %in% c('PEP','Pyruvic acid') & !is.na(Conc_log) & SGroup %in% c("OP50-C + IPTG50","oecrp + IPTG50","oecrp + IPTG100")) %>%
+  mutate(Energy=ifelse(Metabolite=='PEP','PEP','Pyr'),
+         Energy=factor(Energy,levels=c('Pyr','PEP')),
+         Overexpression=case_when(Group=='C_0_I50' ~ "None",
+                                  Group=="oeCRP_0_I50" ~ "50",
+                                  Group=="oeCRP_0_I100" ~ "100"),
+         Overexpression=factor(Overexpression, levels=c("None",'50',"100")))
+
+
+Pepyroe$Overexpression
+
+
+pepyroe.stats<-Pepyroe %>%
+  ungroup %>%
+  lmtests('Conc_log~Energy*Overexpression') %>%
+  rename(Metabolite=Energy)
+
+
+Pepyroe
+
+
+
+
 #PCA plots
 # HC<-PCAres$HC
 # pca<-PCAres$pca
 # pcaloadings<-PCAres$Loadings
 # pcashape=PCAres$pcashape
+
+
 
 PCAplot<-function(PCAres) {
   ellipses<-PCAres$Ellipses
@@ -240,11 +389,11 @@ PCAplot<-function(PCAres) {
 }
 
 
-metcomplete<-met.sel %>%
-  group_by(Metabolite) %>%
-  mutate(Filling_missing=any(is.na(Filled_conc))) %>%
-  ungroup %>%
-  filter(!Filling_missing)
+
+
+
+
+
 
 #Original - HMT linear scale filled
 metcomplete %>%
@@ -331,7 +480,7 @@ heatcomplete %>%
   HMap('ID','Metabolite','Conc_log',hinfo,cols=cols)
 
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,"/Heatmap_All.pdf",sep=''),
-             width=12,height=8)
+             width=8,height=6)
 
 
 #Heatmap - No Glucose
@@ -509,6 +658,8 @@ results.all<-met.clean %>%
   getresults(contrasts.desc)
 
 #Separate results
+
+
 results<-results.all$results
 
 results.cast<-results.all$cast 
@@ -523,17 +674,20 @@ results.summary<-results %>%
   summarise(Estimate=!is.na(logFC)) %>%
   spread(Contrast,Estimate)
 
-results.summary
+results.summary %>%
+  write.csv(paste(odir,'/Missing_comparisons.csv',sep=''),row.names = FALSE)
 
-results %>%
-  group_by(Contrast) %>%
+
+dif_summary<-results %>%
+  group_by(Contrast,Description) %>%
   summarise(Total=n(),
             Up=sum(logFC>0 & FDR<=0.05,na.rm=TRUE),
             Down=sum(logFC<0 & FDR<=0.05,na.rm=TRUE),
             All=sum(FDR<=0.05,na.rm=TRUE))
 
 
-write.csv(results.summary,paste(odir,'/Missing_comparisons.csv',sep=''),row.names = FALSE)
+dif_summary %>%
+  write.csv(paste(odir,'/Stats_summary.csv',sep=''),row.names = FALSE)
 
 
 #Consistency checks
@@ -570,7 +724,7 @@ lblsize<-2
 amp<- 8
 cbrks<-seq(-amp,amp,by=2)
 #gradcols<-c('black','purple','purple')
-maincomp<-'Interaction strength'
+maincomp<-'Difference,\nlogFC'
 
 
 gradcols<-c('blue4','blue','gray80','red','red4')
@@ -605,6 +759,69 @@ results.multi2 %>%
 dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Scatter_Various_vs_OP50_Meft.pdf',sep = ''),
              width=18,height=18,useDingbats=FALSE)
 
+
+colnames(results.multi2)
+
+results.multi %>%
+  filter(x_Contrast=='C_Metf' &
+           y_Contrast %in% c('CRP_Metf','CGlu_Metf','oeCRP50','oeCRP100') &
+           z_Contrast_type=='Interaction',
+           z_Strain==y_Strain &
+           z_Supplement==y_Supplement) %>%
+  ggplot(aes(x=x_logFC,y=y_logFC,color=z_logFC))+
+  geom_smooth(method="lm",fullrange=TRUE,se=FALSE, size=0.5,color='red')+
+  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
+  geom_errorbar(aes(ymin=y_NE,ymax=y_PE),alpha=erralpha,color=errcolor,width=0)+
+  geom_point()+
+  scale_x_continuous(breaks=seq(-10,10,by=1))+
+  scale_y_continuous(breaks=seq(-10,10,by=1))+
+  geom_text_repel(aes(label=ifelse(z_FDR<0.01 & abs(z_logFC)>1 | Metabolite %in% mets, as.character(Metabolite),"" ) ),
+                  size=lblsize,
+                  force=2,
+                  segment.colour=errcolor,
+                  segment.alpha =erralpha)+
+
+  xlab('Metformin effect on OP50')+
+  ylab('Other effects')+
+  scale_colour_gradientn(colours = gradcols,
+                         breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
+  facet_wrap(~y_Description,ncol=2)+
+  theme(panel.grid.minor = element_blank())
+
+ggsave(file=paste(odir,'/Scatter_Selection_vs_OP50_Meft.pdf',sep = ''),
+       width=110,height=110,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+scatter.fit<-results.multi %>%
+  filter(x_Contrast=='C_Metf' &
+           y_Contrast %in% c('CRP_Metf','CGlu_Metf','oeCRP50','oeCRP100') &
+           z_Contrast_type=='Interaction',
+         z_Strain==y_Strain &
+           z_Supplement==y_Supplement) %>%
+  group_by(y_Contrast) %>%
+  do(broom::tidy(lm(y_logFC~x_logFC,data=.)))
+
+
+
+
+scatter.r<-results.multi %>%
+  filter(x_Contrast=='C_Metf' &
+           y_Contrast %in% c('CRP_Metf','CGlu_Metf','oeCRP50','oeCRP100') &
+           z_Contrast_type=='Interaction',
+         z_Strain==y_Strain &
+           z_Supplement==y_Supplement) %>%
+  group_by(y_Contrast) %>%
+  do(broom::glance(lm(y_logFC~x_logFC,data=.)))
+
+
+
+scatter.fit
+
+
+scatter.r
 
 
 
@@ -750,9 +967,17 @@ mets
 
 
 results %>%
-  #filter(Contrast %in% c('C_Metf','CRP_Metf','oeCRP50','oeCRP100') ) %>% # No Glucose
-  filter(Contrast %in% c('C_Metf','CRP_Metf','C_Glu','CGlu_Metf','oeCRP50','oeCRP100') ) %>% # No Glucose
-  VolcanoPlot(mets)
+  group_by(Contrast) %>%
+  arrange(FDR) %>%
+  mutate(Show=row_number()==1) %>%
+  filter(Contrast %in% c('C_Metf','CRP_Metf','C_Glu','CGlu_Metf','oeCRP50','oeCRP100') ) %>% # 
+  VolcanoPlot(mets)+
+  geom_text_repel(aes(label=ifelse(Show,as.character(Metabolite),'')),size=5)
+
+
+
+
+
 
 #No Glucose
 # ggsave(file=paste(odir,'/Volcano_Publication_4_logFCcolor.pdf',sep = ''),
@@ -760,7 +985,7 @@ results %>%
 
 #Glucose
 ggsave(file=paste(odir,'/Volcano_Publication_4_logFCcolor_Glucose.pdf',sep = ''),
-       width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
+       width=110,height=110,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
 #mets,
@@ -795,9 +1020,6 @@ results %>%
 
 
 #Venn diagram
-results.ecocel %>%
-  filter(MetaboliteU=="D-Glucosaminic Acid" & Contrast=="T-C")
-
 
 venn.pass<-results %>%
   mutate(Up=logFC>0 & FDR<0.05,
@@ -819,6 +1041,9 @@ metmatch100<-venn.pass %>%
   unlist(recursive=FALSE)
 
 
+venn.pass
+
+
 metmatch50<-venn.pass %>%
   filter(Contrast %in% c('C_Metf','oeCRP50') & Type!="All") %>%
   unite(OT,Contrast,Type) %>%
@@ -827,11 +1052,12 @@ metmatch50<-venn.pass %>%
   as.list %>%
   unlist(recursive=FALSE)
 
+
+
 metmatch50<-metmatch50[c(4,3,2,1)]
 metmatch100<-metmatch100[c(4,3,2,1)]
 
 vcols<-c("red","red4","blue","blue4")
-
 
 grid::grid.draw(VennDiagram::venn.diagram(metmatch50, col=vcols,cat.col=vcols ,NULL))
 
@@ -839,6 +1065,59 @@ dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Venn_HMT_oeCRP50.pdf",sep=''),
              width=3,height=3, useDingbats=FALSE)
 dev.off()#
+
+
+
+#CRP match
+metmatchcrp<-venn.pass %>%
+  filter(Contrast %in% c('C_Metf','CRP_Metf') & Type!="All") %>%
+  unite(OT,Contrast,Type) %>%
+  select(OT,List) %>%
+  spread(OT,List) %>%
+  as.list %>%
+  unlist(recursive=FALSE)
+
+metmatchcrp<-metmatchcrp[c(4,3,2,1)]
+
+vcols<-c("red","red4","blue","blue4")
+dev.off()#
+grid::grid.draw(VennDiagram::venn.diagram(metmatchcrp, col=vcols,cat.col=vcols ,NULL))
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Venn_HMT_crp.pdf",sep=''),
+             width=3,height=3, useDingbats=FALSE)
+dev.off()#
+
+
+
+metmatchAll<-results %>%
+  mutate(Up=logFC>0 & FDR<0.05,
+         Down=logFC<0 & FDR<0.05,
+         All=FDR<0.05) %>%
+  #gather different thresholds
+  gather(Type,Pass,Up,Down,All) %>%
+  filter(Pass) %>%
+  filter(Contrast %in% c('C_Metf','oeCRP50','oeCRP100') & Type!='All') %>%
+  group_by(Strain,Type) %>%
+  do(List=c(as.character(.$Metabolite))) %>%
+  unite(OT,Strain,Type) %>%
+  select(OT,List) %>%
+  spread(OT,List) %>%
+  as.list %>%
+  unlist(recursive=FALSE)
+
+
+vcols<-c("red","red4","blue","blue4")
+grid::grid.draw(VennDiagram::venn.diagram(metmatch50, col=vcols,cat.col=vcols ,NULL))
+
+dev.copy2pdf(device=cairo_pdf,
+             file=paste(odir,"/Venn_HMT_oeCRPAll.pdf",sep=''),
+             width=3,height=3, useDingbats=FALSE)
+
+dev.off()#
+
+
+
 
 
 # 

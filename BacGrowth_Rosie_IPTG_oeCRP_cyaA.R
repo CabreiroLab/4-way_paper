@@ -100,6 +100,10 @@ data <- read_csv("IPTG titration/Data/Summary.csv") %>%
 
 
 
+data %>%
+  write_csv(paste0(odir, "/Raw_data_Summary.csv"))
+
+
 
 
 
@@ -190,10 +194,6 @@ data %>%
   View()
 
 
-
-
-data %>%
-  write_csv(paste0(odir, "/Raw_data_Summary.csv"))
 
 
 

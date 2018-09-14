@@ -210,6 +210,10 @@ stat<-data %>%
          pStars=pStars(p.value)) 
 
 
+stat %>% 
+  filter(Normalisation=='Norm_C' & Measure=='logAUC' & Strain=='crp')
+
+
 
 stat2<-data %>%
   filter(Measure=="logAUC" & Normalisation=="Value") %>%
@@ -298,7 +302,7 @@ PlotComp<-function(data,stars,measname) {
     #ggtitle("Significance shown for differences vs OP50-C")+
     scale_colour_manual(name = Strainlab,values = Straincols)+
     scale_fill_manual(name = Strainlab,values = Straincols)+
-    labs(color='Strain',fill='Strain')+
+    #labs(color='Strain',fill='Strain')+
     ylab(paste0(measname," vs OP50-C Control, %") )+
     xlab("Metformin, mM")+
     geom_text(data=stars,
@@ -340,16 +344,75 @@ PlotComp2<-function(data,stars,measname) {
 #   PlotComp2(.,stat %>% filter(!Strain %in% c("crp","cra","argR","ntrC") & Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"),unique(as.character(.$MeasShort)) )+
 #   ylab("Growth AUC vs OP50-C Control, %" )
 # 
-# 
-# 
 # ggsave(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_logAUC_SD.pdf"),
 #        width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial")
 
 
-Compplots<-data.sum %>%
-  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
-  group_by(Measure) %>%
-  do(plot=PlotComp(.,stat %>% filter(Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"), unique(as.character(.$MeasShort)) ) )
+data.sum %>%
+  filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>%
+  PlotComp(filter(stat,Measure=='logAUC', Normalisation=="Norm_C"),'Growth AUC' )
+
+
+ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_logAUC_fix.pdf",sep=''),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+levels(data.sum$Strain)
+
+FS6<-c('OP50-C','ntrC','arcA','csiR','fur','gcvA','marA','mlc','nac')
+
+data.sum %>%
+  ungroup %>%
+  filter(Normalisation=="Norm_CM" & Measure=="logAUC" & Strain %in% FS6) %>%
+  mutate(Strain=factor(Strain,levels=FS6)) %>%
+  PlotComp(filter(stat,Measure=='logAUC', Normalisation=="Norm_C" & Strain %in% FS6),'Growth AUC' )
+
+
+ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_FigS6.pdf",sep=''),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+F6<-c('OP50-C','crp','cra','argR')
+
+data.sum %>%
+  ungroup %>%
+  filter(Normalisation=="Norm_CM" & Measure=="logAUC" & Strain %in% F6) %>%
+  mutate(Strain=factor(Strain,levels=F6)) %>%
+  PlotComp(filter(stat,Measure=='logAUC', Normalisation=="Norm_C" & Strain %in% F6),'Growth AUC' )+
+  theme(legend.position = "top")
+
+
+ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_Fig6.pdf",sep=''),
+       width=35,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+FT<-c('OP50-C','crp','cra','argR','ntrC')
+
+data.sum %>%
+  ungroup %>%
+  filter(Normalisation=="Norm_CM" & Measure=="logAUC" & Strain %in% FT) %>%
+  mutate(Strain=factor(Strain,levels=FT)) %>%
+  PlotComp(filter(stat,Measure=='logAUC', Normalisation=="Norm_C" & Strain %in% FT),'Growth AUC' )
+
+
+ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_Thesis.pdf",sep=''),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
+# Compplots<-data.sum %>%
+#   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
+#   group_by(Measure) %>%
+#   do(plot=PlotComp(.,stat %>% filter(Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"), unique(as.character(.$MeasShort)) ) )
+# 
+# 
+# map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_SD.pdf"),
+#      Compplots$plot,
+#      width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial",ggsave)
 
 
 
@@ -358,30 +421,27 @@ Compplots.I<-data.sum %>%
   group_by(Measure) %>%
   do(plot=PlotComp(.,stat2, unique(as.character(.$MeasShort)) ) )
 
-
-
-Compwrap<-data.sum %>%
-  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
-  group_by(Measure) %>%
-  do(plot=PlotComp(.,stat %>% filter(Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain,ncol=6))
-
- 
-
-
-map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_SD.pdf"),
-     Compplots$plot,
-     width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial",ggsave)
-
-
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_Interaction_SD.pdf"),
      Compplots.I$plot,
      width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial",ggsave)
 
 
 
+Compwrap<-data.sum %>%
+  filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
+  group_by(Measure) %>%
+  do(plot=PlotComp(.,stat %>% filter(Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"),unique(as.character(.$MeasShort)) ) + facet_wrap(~Strain,ncol=6)) %>%
+  mutate(file=)
+
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),"_SD.pdf"),
      Compwrap$plot,
      width=110,height=41,units ='mm', scale=2,device=cairo_pdf,family="Arial",ggsave)
+
+
+
+
+
+
 
 
 

@@ -413,9 +413,13 @@ dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/RNAseq_BCV_batch-adjusted.pdf",sep=''),
              width=9,height=6, useDingbats=FALSE)
 
+
+
 MDSxy<-data.frame(cbind(MDSdata$x,MDSdata$y))
 
 colnames(MDSxy)<-c('PC1','PC2')
+
+
 write.csv(MDSxy,paste(odir,"/RNAseq_MDS_data.csv",sep=''),row.names=FALSE)
 
 
