@@ -29,8 +29,8 @@ setwd(cwd)
 
 
 
-odir<-'Summary_Ecoli_HMT'
-#odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
+#odir<-'Summary_Ecoli_HMT'
+odir<-'Summary_Ecoli_HMT/NoGlucose_stats'
 
 
 
@@ -54,64 +54,6 @@ lmfill<-function(data,formula) {
 }
 
 
-
-lmtests<-function(data,formula) {
-  
-  val<-formula %>% str_split("~") %>% unlist(.) %>% first()
-  facs<-formula %>% str_split("~") %>% unlist(.) %>% nth(2) %>% str_split("\\*") %>% unlist
-  fac1<-facs[1]
-  fac2<-facs[2]
-  
-  facregex<-paste(fac1,fac2,sep="|")
-  
-  groupings<-group_vars(data)
-  
-  #Effect of first factor
-  stat1<-data %>%
-    group_by_(.dots=c(groupings,fac2)) %>%
-    do(broom::tidy(lm(as.formula(paste(val,fac1,sep="~")),data=.)) ) %>%
-    ungroup %>%
-    filter(term!='(Intercept)') %>%
-    mutate(term=str_replace_all(term,facregex,""),
-           Contrast_type=fac1 )%>%
-    rename_(.dots=setNames("term",fac1))
-  
-  
-  #Effect of second factor
-  stat2<-data %>%
-    group_by_(.dots=c(groupings,fac1)) %>%
-    do(broom::tidy(lm(as.formula(paste(val,fac2,sep="~")),data=.)) ) %>%
-    ungroup %>%
-    filter(term!='(Intercept)') %>%
-    mutate(term=str_replace_all(term,facregex,""),
-           Contrast_type=fac2)%>%
-    rename_(.dots=setNames("term",fac2))
-  
-  #Effect of interaction
-  stat3<-data %>%
-    do(broom::tidy(lm(as.formula(formula),data=.)) ) %>%
-    ungroup %>%
-    filter(str_detect(term,":")) %>%
-    mutate(term=str_replace_all(term,facregex,""),
-           Contrast_type="Interaction")%>%
-    separate(term,c(fac1,fac2))
-  
-  stat<-stat1 %>%
-    rbind(stat2) %>%
-    rbind(stat3) %>%
-    rename(SE=std.error,
-           logFC=estimate) %>%
-    mutate(PE=logFC+SE,
-           NE=logFC-SE,
-           Prc=2^logFC*100,
-           PrcNE=2^NE*100,
-           PrcPE=2^PE*100,
-           pStars=pStars(p.value)) %>%
-    mutate_at(c(fac1,fac2,"Contrast_type"),as.factor) %>%
-    select(one_of(groupings),"Contrast_type",fac1,fac2,everything())
-  
-  return(stat)
-}
 
 
 
@@ -303,7 +245,7 @@ Pepyr<-metcomplete %>%
 
 pepyr.stats<-Pepyr %>%
   group_by(SGroup) %>%
-  lmtests('Conc_log~Energy*Metformin_mM') %>%
+  lmtest('Conc_log~Energy*Metformin_mM') %>%
   rename(Metabolite=Energy,Sample=SGroup)
 
 
@@ -652,7 +594,7 @@ contr.matrix
 
 results.all<-met.clean %>%
   #filter(Metabolite=='Gly') %>%
-  #filter(Supplement!='Glucose') %>%
+  filter(Supplement!='Glucose') %>%
   group_by(Metabolite,Metabolite_ID,Metabolite_full,KEGG_ID,HMDB_ID) %>%
   do(hypothesise(.,"Conc_log~0+Group",contr.matrix)) %>%
   getresults(contrasts.desc)
@@ -684,6 +626,9 @@ dif_summary<-results %>%
             Up=sum(logFC>0 & FDR<=0.05,na.rm=TRUE),
             Down=sum(logFC<0 & FDR<=0.05,na.rm=TRUE),
             All=sum(FDR<=0.05,na.rm=TRUE))
+
+
+
 
 
 dif_summary %>%

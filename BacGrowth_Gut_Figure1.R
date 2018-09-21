@@ -195,7 +195,10 @@ lmdata_D<-data.int%>%
   
 
 results<-rbind(lmdata_S,lmdata_D) %>%
-  mutate(Contrast=factor(Contrast,levels=contrasts.desc$Contrast)) %>%
+  mutate(Contrast=factor(Contrast,levels=contrasts.desc$Contrast),
+         Prc=100*2^logFC,
+         PrcPE=100*2^(logFC+SE),
+         PrcNE=100*2^(logFC-SE)) %>%
   select(Measure,ID,Day,Group,Strain,Metformin_mM,Contrast,Contrast_type,Description,everything())
 
 
@@ -221,6 +224,8 @@ View(results)
 
 # head(results.castfull)
 # head(results.cast)
+
+results
 
 
 write.csv(results,paste(odir,'/Growth_results.csv',sep=''),row.names = FALSE)

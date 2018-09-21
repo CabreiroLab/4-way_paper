@@ -60,7 +60,9 @@ odir<-'Results'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-#load('.RData')
+#load('Proteomics.RData')
+
+
 
 getinfo<-function(cof) {
   df<-data.frame(cof)
@@ -1165,10 +1167,10 @@ D.comb<-rbind(D.all,D.up,D.down)
 
 #Enrichment combined
 #TF enrichment
-TFsum<-read_csv('Results/TF_enrichment.csv')
+TFsum<-read.csv('Results/TF_enrichment.csv')
 
-
-TF.en<-TFsum[TFsum$TvC_FDR<0.05,c('TF','TvC_p','TvC_FDR')]
+#TF.en<-TFsum[TFsum$TvC_FDR<0.05,c('TF','TvC_p','TvC_FDR')]
+TF.en<-TFsum[,c('TF','TvC_p','TvC_FDR')]
 TF.en$Test<-'All'
 TF.en$Category<-'Transcription factor'
 TF.en<-rename(TF.en,c('TvC_p'='p','TvC_FDR'='FDR','TF'='Term'))
@@ -1177,8 +1179,8 @@ TF.en<-TF.en[order(TF.en$FDR),]
 
 #KEGG enrichment
 
-
-KEGG.en<-subset(D.comb,FDR<0.05 &
+#FDR<0.05 &
+KEGG.en<-subset(D.comb,
                   !Term %in% c('eco01130:Biosynthesis of antibiotics') &
                   !Category %in% c('GOTERM_CC_DIRECT','GOTERM_MF_DIRECT','UP_SEQ_FEATURE'))[,c('Type','Category','Term','PValue','FDR')]
 KEGG.en<-rename(KEGG.en,c('Type'='Test','PValue'='p'))
@@ -1187,8 +1189,8 @@ KEGG.en<-rename(KEGG.en,c('Type'='Test','PValue'='p'))
 
 
 
-ece.en<-read_csv('Results/EcoCyc_enrichment.csv')
-EC.en<-subset(ece.en,FDR<0.05 & Contrast=='C_T-C_C')[,c('Test','Pathway','p','FDR')]
+ece.en<-read.csv('Results/EcoCyc_enrichment.csv')
+EC.en<-subset(ece.en,Contrast=='C_T-C_C')[,c('Test','Pathway','p','FDR')] #FDR<0.05 & 
 EC.en$Category<-'EcoCyc'
 EC.en<-rename(EC.en,c('Pathway'='Term'))
 
@@ -1202,8 +1204,8 @@ head(KEGG.en)
 all.en<-rbind(TF.en,EC.en,KEGG.en)[,c('Category','Test','Term','p','FDR')]
 
 
-all.en %>%
-  write_csv(paste0(odir,'/Enrichment_all.csv'))
+
+write.csv(all.en,paste0(odir,'/Enrichment_all_complete.csv'))
 
 
 

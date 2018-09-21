@@ -22,8 +22,8 @@ odir<-'Summary_Acetoacetate'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-#save.image('BGA_Argmuts.RData')
-#load('BGA_Argmuts.RData')
+#save.image('BGA_Acetoacetate.RData')
+#load('BGA_Acetoacetate.RData')
 
 
 
@@ -225,11 +225,24 @@ stat2<-data %>%
   mutate_at(c("Metformin_mM",'Acetoacetate_mM'),as.factor)
 
 
+
+
+head(data)
+stat.new<-data %>%
+  filter(Normalisation=='Value' ) %>%
+  group_by(Measure) %>%
+  lmtest("Value~Acetoacetate_mM*Metformin_mM")
+
+
+
+stat.new$Acetoacetate_mM
+stat.new$Metformin_mM
+
 # Metformin_mM=str_extract(term,'[[:digit:]]{1,3}'),
 # Metformin_mM=factor(Metformin_mM,levels=metf ),
 
 
-stat %>%
+stat.new %>%
   write_csv(paste0(odir,"/Stats_Summary.csv"))
 
 

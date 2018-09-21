@@ -325,6 +325,19 @@ stats.S <- data %>%
     Strain=str_replace_all(term,"Strain","")
   )
 
+stats.I <- data %>%
+  filter(Normalisation == "Value" & !is.na(Value) & !(Strain=='crp' & Overexpression=='None')) %>%
+  group_by(Media,Measure,Overexpression,Strain) %>%
+  do(tidy(lm(Value ~ IPTG_mM, data = .))) %>%
+  mutate(
+    Comparison = case_when(
+      str_detect(term, "\\:") ~ "Interaction",
+      str_detect(term, "IPTG_mM") ~ "IPTG_mM",
+      str_detect(term, "IPTG_mM") ~ "IPTG_mM"
+    ),
+    IPTG_mM=str_replace_all(term,"IPTG_mM","")
+  )
+
 
 stats.SI <- data %>%
   filter(Normalisation == "Value" & !is.na(Value) ) %>%
@@ -386,6 +399,7 @@ colnames(stats.OI)
 
 stats <- stats.O %>%
   bind_rows(stats.S) %>%
+  bind_rows(stats.I) %>%
   bind_rows(stats.SI) %>%
   bind_rows(stats.OI) %>%
   filter(term != "(Intercept)") %>%

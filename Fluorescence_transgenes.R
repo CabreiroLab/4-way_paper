@@ -334,8 +334,15 @@ RNAresults<-results %>%
 RNAresults %>%
   write_csv(paste0(odir,'/Results_with_RNAseq.csv'))
 
+RNAresults.sbs<-RNAresults %>%
+  gather(Stat,Value,logFC,FDR,Stars) %>%
+  mutate(ST=paste(ifelse(Type=='Fluorescence','Fluor','RNAseq'),Stat,sep='_')) %>%
+  select(Gene,Description,ST,Value) %>%
+  spread(ST,Value) %>%
+  mutate_at(vars(matches('logFC|FDR')),as.numeric) 
 
-
+RNAresults.sbs %>%
+  write_csv(paste0(odir,'/Results_with_RNAseq_side-by-side.csv'))
 
 amp<-10
 

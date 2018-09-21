@@ -151,7 +151,8 @@ dev.copy2pdf(device=cairo_pdf,
              width=6,height=4)
 
 
-
+stat %>%
+  write_csv(paste0(odir,"/Stats.csv"))
 
 
 

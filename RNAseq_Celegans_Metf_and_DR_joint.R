@@ -2,37 +2,37 @@ library(tidyverse)
 library(ggthemes)
 
 
-devtools::install_github("PNorvaisas/PFun")
+#devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-theme_Publication <- function(base_size=14) {
-  (theme_foundation(base_size=base_size)
-   + theme(plot.title = element_text(face = "bold",
-                                     size = rel(1.2), hjust = 0.5),
-           text = element_text(),
-           panel.background = element_rect(colour = NA),
-           plot.background = element_rect(colour = NA),
-           #panel.border = element_rect(colour = NA),
-           axis.title = element_text(face = "bold",size = rel(1)),
-           axis.title.y = element_text(angle=90,vjust =2),
-           axis.title.x = element_text(vjust = -0.2),
-           axis.text = element_text(), 
-           axis.line = element_line(colour="black"),
-           axis.ticks = element_line(),
-           panel.grid.major = element_line(colour="#f0f0f0"),
-           panel.grid.minor = element_blank(),
-           legend.key = element_rect(colour = NA),
-           #legend.position = "bottom",
-           #legend.direction = "horizontal",
-           #legend.key.size= unit(0.2, "cm"),
-           #legend.margin = unit(0, "cm"),
-           legend.title = element_text(face="italic"),
-           #plot.margin=unit(c(10,5,5,5),"mm"),
-           strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
-           strip.text = element_text(face="bold")
-   ))
-  
-}
+# theme_Publication <- function(base_size=14) {
+#   (theme_foundation(base_size=base_size)
+#    + theme(plot.title = element_text(face = "bold",
+#                                      size = rel(1.2), hjust = 0.5),
+#            text = element_text(),
+#            panel.background = element_rect(colour = NA),
+#            plot.background = element_rect(colour = NA),
+#            #panel.border = element_rect(colour = NA),
+#            axis.title = element_text(face = "bold",size = rel(1)),
+#            axis.title.y = element_text(angle=90,vjust =2),
+#            axis.title.x = element_text(vjust = -0.2),
+#            axis.text = element_text(), 
+#            axis.line = element_line(colour="black"),
+#            axis.ticks = element_line(),
+#            panel.grid.major = element_line(colour="#f0f0f0"),
+#            panel.grid.minor = element_blank(),
+#            legend.key = element_rect(colour = NA),
+#            #legend.position = "bottom",
+#            #legend.direction = "horizontal",
+#            #legend.key.size= unit(0.2, "cm"),
+#            #legend.margin = unit(0, "cm"),
+#            legend.title = element_text(face="italic"),
+#            #plot.margin=unit(c(10,5,5,5),"mm"),
+#            strip.background=element_rect(colour="#f0f0f0",fill="#f0f0f0"),
+#            strip.text = element_text(face="bold")
+#    ))
+#   
+# }
 
 
 theme_set(theme_Publication())
@@ -187,6 +187,52 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Enrichment_heatmap_DR_KEGG_aging
 
 
 
-
+# 
+# unique(enr$Type)
+# 
+# enr %>%
+#   filter(Type=='Metf_Old' & !ID %in% DRexclude$ID) %>%
+#   #filter(Type=='DR' & !ID %in% DRexclude$ID) %>%
+#   filter(Comparison %in% sel.conts[[unique(as.character(Type))]]) %>%
+#   mutate(Comparison=factor(Comparison,levels=sel.conts[[unique(as.character(Type))]])) %>%
+#   group_by(Description) %>%
+#   mutate(Select=sum(FDR<0.05)>1) %>%
+#   ungroup %>%
+#   filter(Select)%>%
+#   mutate(Description=factor(Description,levels=clustorder(.,'Description','CD','logFDR',reverse=TRUE))) %>%
+#   ggplot(aes(x=Direction,y=Description))+
+#   geom_tile(aes(fill=FDRbin))+
+#   scale_fill_manual(values =enrcols)+
+#   xlab("Direction of change")+
+#   ylab('KEGG pathway')+
+#   labs(fill='FDR')+
+#   theme(axis.ticks=element_blank(),
+#         panel.border=element_blank(),
+#         panel.grid.minor = element_blank(),
+#         panel.grid.major = element_blank(),
+#         axis.line = element_line(colour = NA),
+#         axis.line.x = element_line(colour = NA),
+#         axis.line.y = element_line(colour = NA),
+#         strip.text = element_text(colour = 'black', face='bold',size=10),
+#         axis.text.x= element_text(face='bold', colour='black', size=10, angle = 90, hjust = 1))+
+#   facet_grid(~Comparison)
+# 
+# 
+# 
+# 
+# metf.GO<-read_csv('Celegans_metformin/Results/All_results_GO.csv') %>%
+#   filter(Comparison %in% c('RM-R','SM-S','SM-S-(RM-R)') & Threshold=='None') %>%
+#   rename(Count_Up=Up,Count_Down=Down,
+#          FDR_Up=P.Up,FDR_Down=P.Down) %>%
+#   gather(Measure,Value,Count_Up:FDR_Down) %>%
+#   separate(Measure,c('Measure','Direction')) %>%
+#   spread(Measure,Value) %>%
+#   unite(CD,Comparison,Direction,remove = FALSE) %>%
+#   mutate(logFDR=abs(-log10(FDR)),
+#          FDRbin=cut(logFDR,breaks=enrbrks,labels=enrlbls,right=FALSE),
+#          Direction=factor(Direction,levels=c('Up','Down'))) %>%
+#   select(Direction,Comparison,CD,ID,Description,everything()) %>%
+#   select(Ont,Description,ID,CD,FDR) %>%
+#   spread(CD,FDR)
 
 

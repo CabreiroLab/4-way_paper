@@ -273,16 +273,21 @@ all.results.KEGG %>%
 
 all.results.sbs<-results.ecocel %>%
   gather(Stat,Value,logFC,SE,FDR) %>%
-  filter(Measure %in% c('G',"F") & Contrast=="T-C" ) %>%
-  mutate(OMC2=paste(Organism_short,Stat,sep='_')) %>%
+  filter(Measure %in% c('G',"F") & Contrast %in% c("T-C","T","C") ) %>%
+  mutate(OMC2=paste(Organism_short,Contrast,Stat,sep='_')) %>%
   select(OMC2,Plate:KEGG_ID,Value) %>%
   spread(OMC2,Value) %>%
   left_join(kegg.mappings,by = c('KEGG_ID'='all.mapped')) %>%
   left_join(EC_mappings) %>%
-  select(Plate:KEGG_ID,Pathway_IDs,Pathways,EcoCyc_Instances,EcoCyc_Classes,Ec_logFC,Ec_SE,Ec_FDR,Ce_logFC,Ce_SE,Ce_FDR)
+  select(Plate:KEGG_ID,Pathway_IDs,Pathways,EcoCyc_Instances,EcoCyc_Classes,`Ec_T-C_logFC`,`Ec_T-C_SE`,`Ec_T-C_FDR`,`Ce_T-C_logFC`,`Ce_T-C_SE`,`Ce_T-C_FDR`,Ec_C_logFC,Ec_C_SE,Ec_C_FDR,Ec_T_logFC,Ec_T_SE,Ec_T_FDR)
   
+
+glimpse(all.results.sbs)
+
 all.results.sbs %>%
   write_csv(paste0(odir,"/All_results_side_by_side_withKEGGEcoCycClass.csv")) 
+
+
 
 
 View(all.results.sbs)
@@ -1367,7 +1372,7 @@ pmcs<-read_csv('../Biolog/EColi_net/All_Media_Mix_clean_explicit.csv')
 
 
 
-
+#Enrichment procedure
 enrbrks<-c(0,-log(0.05,10),2,3,4,100)
 enrlbls<-c('N.S.','<0.05','<0.01','<0.001','<0.0001')
 
@@ -1384,6 +1389,8 @@ EcoCyc.enrichment<-results.ecocel %>%
          Test=factor(Test,levels=c("All","Up","Down")),
          Class=str_replace_all(as.character(Class),"\\|","")) 
   
+
+
 
 EcoCyc.enrichment %>%
   filter(Test!="All" & OMC %in% c("Ec_G_T-C","Ce_F_T-C") & !Class %in% EChm$Class)%>%
@@ -1437,19 +1444,35 @@ EChm<-readxl::read_xlsx(paste0(odir,'/EcoCyc_enrichment_heatmap.xlsx'),sheet = '
   mutate(Class=str_replace_all(as.character(Class),"\\|",""))
 
 
-# classorder<-c("Carbohydrates","Aldehydes-Or-Ketones",
-#               "Carboxylates","Amino-Sugars","Peptides","Alcohols",
-#               "All-Nucleosides","Ribonucleosides","Purines",
-#               "Alpha-Amino-Acids","Amino-Acids","L-Amino-Acids","dicarboxylate",
-#               "Esters","Lactones","Glycosides")
+classorder<-c("Carbohydrates","Aldehydes-Or-Ketones",
+              "Carboxylates","Amino-Sugars","Peptides","Alcohols",
+              "All-Nucleosides","Ribonucleosides","Purines",
+              "Alpha-Amino-Acids","Amino-Acids","L-Amino-Acids","Dicarboxylate",
+              "Esters","Lactones","Glycosides")
+
+
+
+#Class %in% EChm$Class & 
+
+intersect(classorder,EcoCyc.enrichment$Class)
+
+unique(EcoCyc.enrichment$Class)
+
+EcoCyc.enrichment$Class
+
+
+EcoCyc.enrichment<-read_csv(paste0(odir,'/EcoCyc_enrichment_old.csv')) %>%
+  mutate(OMC=ifelse(Organism=='E. coli',"Ec_G_T-C","Ce_F_T-C"))
+
+
 
 EcoCyc.enrichment %>%
-  filter(Test!="All" & Class %in% EChm$Class & OMC %in% c("Ec_G_T-C","Ce_F_T-C") ) %>% 
+  filter(Test!="All" & OMC %in% c("Ec_G_T-C","Ce_F_T-C") ) %>% 
   group_by(Class) %>%
   filter( any(FDR<0.05)) %>%
   ungroup %>%
   clustorder('Class',c("Organism","Test"),'logFDR',descending=FALSE) %>% 
-  #mutate(Class=factor(Class,levels=rev(classorder) )) %>%
+  mutate(Class=factor(Class,levels=rev(classorder) )) %>%
   PlotEnrichment("Test","Class",ncols = length(enrbrks))+
   facet_grid(~Organism)+
   ylab("EcoCyc metabolite class")
@@ -1754,6 +1777,16 @@ KEGGenrich %>%
   filter(Measure %in% c("G","F") & Contrast=="T-C" ) %>%
   write_csv(paste0(odir,"/KEGG_pathway_enrichment.csv"))
 
+
+
+KEGGenrich %>%
+  filter(Measure %in% c("G","F") & Contrast=="T-C" & Type !="All" ) %>%
+  mutate(Interaction=ifelse(Type=='Up','Syn','Ant'),
+           OMCT=paste(ifelse(Organism=='E. coli','Ec','Ce'),Interaction,sep="_")) %>%
+  select(PathwayID,Pathway,OMCT,FDR) %>%
+  spread(OMCT,FDR) %>%
+  select(PathwayID,Pathway,Ec_Ant,Ec_Syn,Ce_Ant,Ce_Syn) %>%
+  write_csv(paste0(odir,"/KEGG_pathway_enrichment_side-by-side.csv"))
 
 
 
