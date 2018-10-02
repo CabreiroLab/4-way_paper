@@ -1,16 +1,16 @@
 # Metformin CRP Project
 
 ## *E. coli* growth analysis
-- BacGrowth_Filipe_D1_D5_D8.R - Bacterial growth analysis for figure 1
-- BacGrowth_GutSize_Figure1.R - Bacterial growth analysis for figure 1
+- BacGrowth_Filipe_D1_D5_D8.R - Bacterial growth analysis for figure 1 ()
+- BacGrowth_GutSize_Figure1.R - Bacterial growth analysis for figure 1 (Gut size changes, data extracted from PPT slides)
 - BacGrowth_Gut_Figure1.R - Bacterial growth analysis for figure 1
-- BacGrowth_Media.R - Bacterial growth analysis for figure 4
-- BacGrowth_Rosie_Acetoacetate.R - Bacterial growth analysis for figure 4
-- BacGrowth_Rosie_Arg_mutants.R - Bacterial growth analysis for figure 7
-- BacGrowth_Rosie_IPTG_oeCRP_cyaA.R - Bacterial growth analysis for figure 5
-- BacGrowth_Rosie_PTS.R - Bacterial growth analysis for figure 6
-- BacGrowth_Rosie_Resistance.R - Bacterial growth analysis for figure 1
-- BacGrowth_Rosie_TF.R - Bacterial growth analysis for figure 5
+- BacGrowth_Media.R - Bacterial growth in different media
+- BacGrowth_Rosie_Acetoacetate.R - Bacterial growth analysis for figure 4 (Acetoacetate supplementation)
+- BacGrowth_Rosie_Arg_mutants.R - Bacterial growth analysis for figure 7 (Arginine degradation pathway knockouts)
+- BacGrowth_Rosie_IPTG_oeCRP_cyaA.R - Bacterial growth for figure 6 (CRP overexpression)
+- BacGrowth_Rosie_PTS.R - Bacterial growth analysis for figure 6 (PTS knockouts)
+- BacGrowth_Rosie_Resistance.R - Bacterial growth analysis for figure 1 (OP50-MR, OP50-R1, OP50-R2)
+- BacGrowth_Rosie_TF.R - Bacterial growth analysis for figure 5 (TF knockouts)
 
 ## 4-way screen analysis
 - Biolog_analysis_NGM_Ecoli.R - 4-way screen analysis for E. coli
@@ -38,22 +38,22 @@
 
 ## *E. coli* and *C. elegans* metabolomics analysis
 - Metabolomics_All_comparison.R - Comparison of various metabolomics datasets
-- Metabolomics_Celegans_AA.R
-- Metabolomics_Celegans_AA_old.R
-- Metabolomics_Celegans_FA.R
-- Metabolomics_Ecoli_100met.R
-- Metabolomics_Ecoli_100met_new.R
-- Metabolomics_Ecoli_AA.R
-- Metabolomics_Ecoli_AA_new.R
-- Metabolomics_Ecoli_HMT.R
-- Metabolomics_Ecoli_nucleotide.R
-- Metabolomics_Ecoli_nucleotide_New_extended.R
-- Metabolomics_Ecoli_nucleotide_metabolomics.R
+- Metabolomics_Celegans_AA.R - *C. elegans* amino acids
+- Metabolomics_Celegans_AA_old.R - *C. elegans* amino acids
+- Metabolomics_Celegans_FA.R - *C. elegans* fatty acids
+- Metabolomics_Ecoli_100met.R - *E. coli* 100 metabolites dataset
+- Metabolomics_Ecoli_100met_new.R - *E. coli* 100 metabolites dataset
+- Metabolomics_Ecoli_AA.R - *E. coli* amino acids
+- Metabolomics_Ecoli_AA_new.R - *E. coli* amino acids
+- Metabolomics_Ecoli_HMT.R - *E. coli* Human Metabolome technologies
+- Metabolomics_Ecoli_nucleotide.R - *E. coli* nucleotide metabolomics
+- Metabolomics_Ecoli_nucleotide_New_extended.R - *E. coli* nucleotide metabolomics
+- Metabolomics_Ecoli_nucleotide_metabolomics.R - *E. coli* nucleotide metabolomics
 
 ## *E. coli* proteomics analysis
 - Proteomics_Ecoli.R - Data analysis
 - Proteomics_Ecoli_update.R - Migration to tidyverse (not complete)
-- Proteomics_TF.R - TF analysis
+- Proteomics_TF.R - TF enrichment analysis
 
 ## *C. elegans* RNA-Seq analysis
 - RNAseq-Metabolomics_Joint_PCA.R - Joint PCA, MDS plots for *C. elegans* metabolomics and RNA-Seq.
