@@ -1,7 +1,7 @@
 # Metformin CRP Project
 
 ## *E. coli* growth analysis
-- BacGrowth_Filipe_D1_D5_D8.R - Bacterial growth analysis for figure 1 ()
+- BacGrowth_Filipe_D1_D5_D8.R - Bacterial growth analysis for figure 1 (growth of bacteria from gut)
 - BacGrowth_GutSize_Figure1.R - Bacterial growth analysis for figure 1 (Gut size changes, data extracted from PPT slides)
 - BacGrowth_Gut_Figure1.R - Bacterial growth analysis for figure 1
 - BacGrowth_Media.R - Bacterial growth in different media
@@ -21,10 +21,10 @@
 ## *C. elegans* fluorescence analysis
 - Fluorescence_Glycerol.R - Nematode fluorescence analysis for glycerol supplementation
 - Fluorescence_TF_acs2.R - Nematode fluorescence analysis with bacterial TF knockouts
-- Fluorescence_collect.R - Nematode fluorescence collect
-- Fluorescence_collect_Acetoacetate_transgenes_Figure4.R - Nematode fluorescence collect and analysis for figure 4
+- Fluorescence_collect.R - Nematode fluorescence data collect. Performs global normalisation of data. Multiple other scripts relie on its output.
+- Fluorescence_collect_Acetoacetate_transgenes_Figure4.R - Nematode fluorescence collect and analysis for figure 4 (Acetoacetate supplementation)
 - Fluorescence_collect_ArgAgm_Figure7.R - Nematode fluorescence analysis for figure 7
-- Fluorescence_figures_redo.R - Nematode fluorescence re-analysis
+- Fluorescence_figures_redo.R - Nematode fluorescence re-analysis for various one-off figures
 - Fluorescence_transgenes.R - Nematode fluorescence analysis for all transgenes (depends on Fluorescence_collect.R)
 - Fluorescence_vha6_Fig5-6.R - Nematode fluorescence analysis for vha-6 reporter
 
