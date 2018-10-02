@@ -55,29 +55,16 @@ library(PFun)
 
 theme_set(theme_light())
 
-#Only useful for annotations, should be replaced
-write.xl<-function(data,explanations,ofile,mode='Full') {
-  print(paste('Writing:',ofile))
-  explst<-subset(explanations,Column %in% colnames(data))
-  explst<-explst[match(colnames(data),explst$Column),]
-  if (mode=='Readme'){
-    write.xlsx2(explst, file=ofile, sheetName="Readme",row.names = FALSE,showNA=FALSE)
-  } else {
-    write.xlsx2(explst, file=ofile, sheetName="Readme",row.names = FALSE,showNA=FALSE)
-    write.xlsx2(data, file=ofile, sheetName="Data", append=TRUE,row.names = FALSE)#showNA=FALSE
-  }
-}
-
 
 #In code should be replaced with rowbind or similar alternative
-mymerge<-function(all.results,results) {
-  if (dim(all.results)[[1]]==0) {
-    all.results<-results
-  } else {
-    all.results<-merge(all.results,results,all.x=TRUE,all.y=TRUE)
-  }
-  return(all.results)
-}
+# mymerge<-function(all.results,results) {
+#   if (dim(all.results)[[1]]==0) {
+#     all.results<-results
+#   } else {
+#     all.results<-merge(all.results,results,all.x=TRUE,all.y=TRUE)
+#   }
+#   return(all.results)
+# }
 
 
 cwd<-"~/Dropbox/Projects/2015-Metformin/RNAseq/Celegans_metformin/"
@@ -87,22 +74,8 @@ odir<-'Results_1thrs_newannot'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-# Generate nice Excel tables for publication
-explanations<-read.xlsx2('Readme.xlsx',sheetName = 'Columns',
-                         stringsAsFactors = TRUE,
-                         header=TRUE)
-
-
-
 pheno_data = read.csv("Pheno_data.csv")
 
-
-
-cnts.g<-read.table('Counts/BN_EN_WB235_gene_count_matrix.csv',sep=',',
-                   header = TRUE,row.names = 1)
-
-
-apply(cnts.g,2,sum)
 
 
 
@@ -124,7 +97,7 @@ dim(celegans.annotation)
 
 
 
-#Use old annotation
+#Get clean read counts
 cnts.gaf.o<-read.table('Results/Raw_data_for_genes.csv',sep = ',',header = TRUE)
 cnts.gaf.o$EntrezProt<-NULL
 cnts.gaf.o$Symbol<-NULL
@@ -132,8 +105,8 @@ cnts.gaf.o$gene_name<-NULL
 cnts.gaf.o<-rename(cnts.gaf.o,c('EntrezGene'='entrezgene'))
 
 
+#Use ENSEMBL transcript IDs (WormBase IDs) for annotations
 cnts.gaf.o$ensembl_transcript_id<-ifelse(grepl('transcript',cnts.gaf.o$t_name), gsub('transcript:','',cnts.gaf.o$t_name),NA  ) 
-
 
 
 head(cnts.gaf.o)
@@ -163,14 +136,12 @@ colnames(raw.data)
 ids<-as.character(pheno_data$ids)
 
 
+
+#Split raw data by sample
 for (id in ids) {
   tbl<-raw.data[,c("gene_id","ensembl_gene_id",id)]
   write.table(tbl,file = paste0('Raw_counts/',id,"_gene_read_counts.txt"),sep = '\t',row.names = FALSE)
 }
-
-
-
-
 
 
 write.csv(raw.data,paste0(odir,"/Raw_clean_gene_data.csv"))
@@ -438,7 +409,7 @@ for (cid in 1:nrow(allcomparisons)) {
       result$LR<-as.double(NA)
     }
     
-    all.results<-mymerge(all.results,data.table(result))
+    all.results<-bind_rows(all.results,data.table(result))
 
     
     if (summary(de.glm)[3]>10 | summary(de.glm)[1] > 10) {
@@ -448,7 +419,7 @@ for (cid in 1:nrow(allcomparisons)) {
       enrichment.KEGG<-rename(enrichment.KEGG,c("Pathway"="Description"))
       enrichment.KEGG$Comparison<-comp
       enrichment.KEGG$Threshold<-thre
-      all.KEGGenrichment<-mymerge(all.KEGGenrichment,data.table(enrichment.KEGG))
+      all.KEGGenrichment<-bind_rows(all.KEGGenrichment,data.table(enrichment.KEGG))
       
       print('...GO enrichment')
       enrichment.GO<-goana(lrt,species='Ce',coef=enrcoef,geneid='entrezgene',convert=TRUE,FDR=0.05,trend='length')
@@ -456,7 +427,7 @@ for (cid in 1:nrow(allcomparisons)) {
       enrichment.GO<-rename(enrichment.GO,c("Term"="Description"))
       enrichment.GO$Comparison<-comp
       enrichment.GO$Threshold<-thre
-      all.GOenrichment<-mymerge(all.GOenrichment,data.table(enrichment.GO))
+      all.GOenrichment<-bind_rows(all.GOenrichment,data.table(enrichment.GO))
       
     } else {
       print("No DE genes!")
@@ -523,15 +494,15 @@ options(scipen=5)
 
 
 write.csv(all.results.kg,paste(odir,'/All_results.csv',sep = ''),row.names = FALSE)
-#write.xl(all.results.kg,explanations,paste(odir,'/All_results.xlsx',sep = ''))
+
 
 
 write.csv(all.KEGGenrichment,paste(odir,'/All_results_KEGG.csv',sep = ''),row.names = FALSE)
-#write.xl(all.KEGGenrichment,explanations,paste(odir,'/All_results_KEGG.xlsx',sep = ''))
+
 
 
 write.csv(all.GOenrichment,paste(odir,'/All_results_GO.csv',sep = ''),row.names = FALSE)
-#write.xl(all.GOenrichment,explanations,paste(odir,'/All_results_GO.xlsx',sep = ''))
+
 
 # 
 # cwd<-"~/Projects/2015-Metformin/RNAseq/Celegans_metformin/"
@@ -644,7 +615,7 @@ for (thres in c('None')) {
   #nrow(gdataf)
   
   write.csv(all.results.rcp,paste(odir,'/All_results_sidebyside_Threshold-',thres,'.csv',sep = ''),row.names = FALSE)
-  #write.xl(all.results.rcp,explanations,paste(odir,'/All_results_sidebyside_Threshold-',thres,'.xlsx',sep = ''),'Readme')
+
   
 
   #Volcano plots
@@ -713,7 +684,7 @@ for (thres in c('None')) {
     }
     
     write.csv(enrichmentcea,paste(odir,'/All_results_sidebyside_',ent,'_Threshold-',thres,'.csv',sep = ''),row.names = FALSE)
-    #write.xl(enrichmentcea,explanations,paste(odir,'/All_results_sidebyside_',ent,'_Threshold-',thres,'.xlsx',sep = ''),'Readme')
+
     
     for (ont in ontologies) {
       for (comp.grh in c('All','Main')) {
@@ -931,7 +902,7 @@ paths<-names(pv.out)
 for (pth in paths) {
   result<-pv.out[[pth]][['plot.data.gene']]
   result$PathwayID<-pth
-  all.kegg.mappingst<-mymerge(all.kegg.mappingst,result)
+  all.kegg.mappingst<-bind_rows(all.kegg.mappingst,result)
 }
 all.kegg.mappingst$mol.col<-NULL
 
@@ -941,7 +912,7 @@ all.kegg.mappings<-merge(path2pathde,all.kegg.mappingst,by='PathwayID',all.y=TRU
 
 
 write.csv(all.kegg.mappings,paste(odir,'/All_KEGG_mappings.csv',sep = ''),row.names = FALSE)
-#write.xl(all.kegg.mappings,explanations,paste(odir,'/All_KEGG_mappings.xlsx',sep=''))
+
 
 
 

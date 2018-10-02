@@ -95,6 +95,7 @@ table(grepl('transcript:',cnts.ga$ENSEMBL))
 
 
 #Fix ENSEMBL_transcript ID for gene level
+#This part is not really releveant anymore, because annotations are later acquired using BioMart
 #There should be a better way without a loop
 prcl<-0
 for (ri in 1:nrow(cnts.ga)){
@@ -168,9 +169,7 @@ table(!is.na(cnts.ga$entrezgene))
 
 
 subset(cnts.ga,is.na(entrezgene))
-
 table(!is.na(cnts.ga$entrezgene))
-
 
 #Based on entrezgene
 table(!is.na(cnts.ga$ENSEMBL))
@@ -209,8 +208,6 @@ table(!is.na(cnts.ga$ENSEMBL))
 
 
 
-
-
 length(unique(cnts.ga$gene_id))
 length(unique(cnts.ga$t_id))
 
@@ -222,8 +219,6 @@ codes<-c('C1','C2','C3','C4',
          'M1','M2','M3','M4',
          'R1','R2','R3','R4',
          'RM1','RM2','RM3','RM4')
-
-
 
 
 #Remove non-expressed transcripts
@@ -242,8 +237,6 @@ dim(cnts.gae)
 # cnts.ag<-subset(cnts.gae,gene_id %in% Duplicated.g)
 # dim(cnts.ag)
 #19709 has duplicates
-
-
 
 #Mark genes which have duplicates
 # unq<-ddply(cnts.gae,.(gene_id),summarise,Unique=length(unique(ENSEMBL))==1)
@@ -323,9 +316,8 @@ colorder<-c('t_name','t_id','entrezgene','ENSEMBL','ENSEMBL_gene','ENSEMBL_trans
 
 cnts.gaf.w<-cnts.gaf[,colorder]
 write.csv(cnts.gaf.w,paste(odir,"/Raw_data_for_genes.csv",sep=''),row.names=FALSE)
-#write.xl(cnts.gaf.w,explanations,paste(odir,"/Raw_data_for_genes.xlsx",sep=''))
+
 
 
 cnts.gae.w<-cnts.gae[,setdiff(colorder,c('entrezgene'))]
 write.csv(cnts.gae.w,paste(odir,"/Raw_data_for_genes_Unfiltered.csv",sep=''),row.names=FALSE)
-#write.xl(cnts.gae.w,explanations,paste(odir,"/Raw_data_for_genes_Unfiltered.xlsx",sep=''))
