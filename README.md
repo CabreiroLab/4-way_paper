@@ -66,7 +66,7 @@
 - **RNAseq_Celegans_Metf_and_DR_joint.R** - *C. elegans* Metformin RNA-Seq and *Heintz et al. 2017* analysis results join
 - **RNAseq_Celegans_Rotenone.R** - Analysis of *Schmeisser et al. 2013* *C. elegans* RNA-Seq data
 - **RNAseq_Celegans_Stringtie_count_prep.R** - Preparation of read-counts from Stringtie
-- **RNAseq_Celegans_Stringtie_count_annot_prep.R** - Preparation of read-counts from Stringtie and their quality control
+- **RNAseq_Celegans_Stringtie_count_annot_prep.R** - Preparation of read-counts from Stringtie annotation checking
 - **RNAseq_Celegans_permutations.R** - Metformin *C. elegans* RNA-Seq re-analysis for MTA
 - **RNAseq_Tuxedo.sh** - Commands for running Tuxedo suite (HiSat + StringTie)
 - **RNAseq_Tuxedo_Paired.sh** - Commands for running Tuxedo suite with paired-end reads (*Heintz 2017*) (HiSat + StringTie)
