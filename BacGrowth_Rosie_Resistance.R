@@ -66,12 +66,24 @@ data.sum<-data %>%
          Prc=2^Mean*100,
          PrcNE=2^NE*100,
          PrcPE=2^PE*100)
+
+
+
   
   
 
 data %>%
   select(-c(NormName,MeasName,MeasShort)) %>%
   write_csv(paste0(odir,"/Raw_data_Summary.csv"))
+
+
+
+
+data.sum %>%
+  #select(-c(NormName,MeasName,MeasShort)) %>%
+  write_csv(paste0(odir,"/Data_Summary.csv"))
+
+
 
 
 data_ts<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Resistance/Data.csv') %>%

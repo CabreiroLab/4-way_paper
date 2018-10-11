@@ -24,7 +24,6 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 #load('BGA_TF.RData')
 
 
-miss<-c('nac','marA')
 
 strainlist<-c('OP50-C','crp','cra','argR','ntrC','arcA','csiR','fur','gcvA','marA','mlc','nac')
 metf<-c("0","25","50","75","100","150")
@@ -283,6 +282,11 @@ Straincols<-ggthemes::tableau_color_pal(palette = "tableau20")(12)
 names(Straincols) <- strainlist
 
 
+Straincols.new<-ggthemes::tableau_color_pal(palette = "tableau20")(13)
+names(Straincols.new) <- strainlist.new
+
+
+
 PlotComp<-function(data,stars,measname) {
 
   data %>%
@@ -300,14 +304,16 @@ PlotComp<-function(data,stars,measname) {
     #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
     geom_point()+
     #ggtitle("Significance shown for differences vs OP50-C")+
-    scale_colour_manual(name = Strainlab,values = Straincols)+
-    scale_fill_manual(name = Strainlab,values = Straincols)+
+    scale_colour_manual(name = Strainlab,values = Straincols.new)+
+    scale_fill_manual(name = Strainlab,values = Straincols.new)+
     #labs(color='Strain',fill='Strain')+
     ylab(paste0(measname," vs OP50-C Control, %") )+
     xlab("Metformin, mM")+
     geom_text(data=stars,
               aes(label=pStars,y=50-as.numeric(Strain)*5 ),nudge_y = 135, show.legend = FALSE,size=5)
 }
+
+
 
 
 PlotComp2<-function(data,stars,measname) {
@@ -359,31 +365,136 @@ ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_logAUC_fi
 
 levels(data.sum$Strain)
 
-FS6<-c('OP50-C','ntrC','arcA','csiR','fur','gcvA','marA','mlc','nac')
+
+MRdata<-read_csv('Summary_resistance/Data_Summary.csv') %>%
+  filter(Strain=='OP50-MR')%>%
+  mutate(Metformin_mM=factor(Metformin_mM,levels=metf))
+
+MRstat<-read_csv('Summary_resistance/Stats_Summary.csv') %>%
+  filter(Strain=='OP50-MR') %>%
+  mutate(Metformin_mM=factor(Metformin_mM,levels=metf))
+
+
+
+
+colnames(MRdata)
+colnames(stat)
+
+head(MRdata)
+head(stat)
+
+
+strainlist.new<-c('OP50-C','OP50-MR','crp','cra','argR','ntrC','arcA','csiR','fur','gcvA','marA','mlc','nac')
+
+
+stat<-stat %>%
+  ungroup %>%
+  bind_rows(MRstat) %>%
+  mutate(Metformin_mM=factor(Metformin_mM,levels=metf),
+         Strain=factor(Strain,levels=strainlist.new))
+
+stat %>%
+  write_csv(paste0(odir,"/Stats_Summary_with_MR.csv"))
+
+
+
+
+data.sum<-data.sum %>%
+  ungroup %>%
+  bind_rows(MRdata) %>%
+  mutate(Metformin_mM=factor(Metformin_mM,levels=metf),
+         Strain=factor(Strain,levels=strainlist.new))
+
+
+FS6<-c('OP50-C','arcA','csiR','fur','gcvA','marA','mlc','nac')
+
+
+stat %>%
+  filter(Strain=='OP50-MR')
+
+
+
+PlotCompfS5<-function(data,stars,measname) {
+  
+  data %>%
+    ggplot(aes(x=Metformin_mM,y=Prc,color=Strain,fill=Strain))+
+    scale_y_continuous(breaks=seq(0,200,by=25))+
+    coord_cartesian(ylim=c(0,150))+
+    geom_hline(aes(yintercept = 100),color='gray75',linetype='longdash')+
+    geom_ribbon(aes(group=interaction(Strain),
+                    ymin=PrcNE,
+                    ymax=PrcPE),
+                alpha=0.75,
+                color=NA,
+                show.legend=FALSE)+
+    geom_line(aes(group=interaction(Strain)))+
+    #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
+    geom_point()+
+    #ggtitle("Significance shown for differences vs OP50-C")+
+    scale_colour_manual(name = Strainlab,values = Straincols.new)+
+    scale_fill_manual(name = Strainlab,values = Straincols.new)+
+    #labs(color='Strain',fill='Strain')+
+    ylab(paste0(measname," vs OP50-C Control, %") )+
+    xlab("Metformin, mM")+
+    geom_text(data=stars,
+              aes(label=pStars,y=50-as.numeric(Strain)*5 ),nudge_y = 135, show.legend = FALSE,size=5)
+}
+
 
 data.sum %>%
   ungroup %>%
   filter(Normalisation=="Norm_CM" & Measure=="logAUC" & Strain %in% FS6) %>%
   mutate(Strain=factor(Strain,levels=FS6)) %>%
-  PlotComp(filter(stat,Measure=='logAUC', Normalisation=="Norm_C" & Strain %in% FS6),'Growth AUC' )
+  PlotCompfS5(filter(stat,Measure=='logAUC', Normalisation=="Norm_C" & Strain %in% FS6),'Growth AUC' )
 
 
 ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_FigS6.pdf",sep=''),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-F6<-c('OP50-C','crp','cra','argR')
+F6<-c('OP50-C','OP50-MR','crp','cra','argR','ntrC')
+
+PlotCompf5<-function(data,stars,measname) {
+  
+  data %>%
+    ggplot(aes(x=Metformin_mM,y=Prc,color=Strain,fill=Strain))+
+    scale_y_continuous(breaks=seq(0,200,by=25))+
+    coord_cartesian(ylim=c(0,150))+
+    geom_hline(aes(yintercept = 100),color='gray75',linetype='longdash')+
+    geom_ribbon(aes(group=interaction(Strain),
+                    ymin=PrcNE,
+                    ymax=PrcPE),
+                alpha=0.75,
+                color=NA,
+                show.legend=FALSE)+
+    geom_line(aes(group=interaction(Strain)))+
+    #geom_errorbar(aes(ymin=PrcNE,ymax=PrcPE),width=0.25,alpha=0.5)+
+    geom_point()+
+    #ggtitle("Significance shown for differences vs OP50-C")+
+    scale_colour_manual(name = Strainlab,values = Straincols.new)+
+    scale_fill_manual(name = Strainlab,values = Straincols.new)+
+    #labs(color='Strain',fill='Strain')+
+    ylab(paste0(measname," vs OP50-C Control, %") )+
+    xlab("Metformin, mM")+
+    geom_text(data=stars,
+              aes(label=pStars,y=50-as.numeric(Strain)*6 ),nudge_y = 110, show.legend = FALSE,size=5)
+}
+
+
 
 data.sum %>%
   ungroup %>%
   filter(Normalisation=="Norm_CM" & Measure=="logAUC" & Strain %in% F6) %>%
   mutate(Strain=factor(Strain,levels=F6)) %>%
-  PlotComp(filter(stat,Measure=='logAUC', Normalisation=="Norm_C" & Strain %in% F6),'Growth AUC' )+
+  PlotCompf5(filter(stat,Measure=='logAUC', Normalisation=="Norm_C" & Strain %in% F6),'Growth AUC' )+
   theme(legend.position = "top")
 
 
 ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_Fig6.pdf",sep=''),
        width=35,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
 
 
 
