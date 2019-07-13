@@ -66,8 +66,6 @@ data<-read_csv('Data/Summary.csv') %>%
   mutate_at(c('SampleID','Sample','Strain','Metformin_mM'),as.factor)
 
 
-
-
 data %>%
   filter(Metabolite=="Negative Control")
 

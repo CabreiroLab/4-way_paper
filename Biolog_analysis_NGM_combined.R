@@ -43,12 +43,12 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 lm_eqn = function(m) {
   fres<-summary(m)
-  l <- list(a = format(abs(coef(m)[2]), digits = 2),
-            b = format(coef(m)[1], digits = 2),
+  l <- list(a = format(abs(coef(m)[[2]]), digits = 2),
+            b = format(coef(m)[[1]], digits = 2),
             r2 = format(summary(m)$r.squared, digits = 2),
-            p2 = format(pf(fres$fstatistic[1], fres$fstatistic[2], fres$fstatistic[3],lower.tail = FALSE)[[1]], digits = 2,scientific=TRUE));
+            p2 = format(pf(fres$fstatistic[[1]], fres$fstatistic[[2]], fres$fstatistic[[3]],lower.tail = FALSE)[[1]], digits = 2,scientific=TRUE));
   
-  if (coef(m)[2] >= 0)  {
+  if (coef(m)[[2]] >= 0)  {
     cof <- substitute(italic(y) == b + a %.% italic(x),l)
     full <- substitute(italic(y) == b + a %.% italic(x)*","~~italic(r)^2~"="~r2*","~~italic(p)~"="~p2,l)
   } else {
@@ -501,6 +501,321 @@ ggsave(file=paste0(odir,"/Scatter_Control-Treatment_Complete_Selmets_large.pdf")
 
 
 
+
+
+amp<-2.2
+cbrks<-c(-2,-1,0,1,2)
+gradcols<-c('blue4','blue','gray80','red','red4')
+
+eccol<-'E. coli\ngrowth\nrescue,\nlogFC'
+cecol<-'C. elegans\nphenotype\nrescue,\nlogFC'
+
+thres<-0.05
+
+gradcols<-c('blue4','blue','gray80','red','red4')
+
+
+fit_TC<-lm(y_logFC~x_logFC,
+           data=filter(ecocelmulti2,
+                       x_OMC=="Ec_G_C",
+                       y_OMC=="Ec_G_T"))
+result_TC<-summary(fit_TC)
+
+
+gsum_TC<-ecocelmulti2 %>%
+  filter(x_OMC %in% c("Ec_G_C"),
+         y_OMC=="Ec_G_T") %>%
+  group_by(x_OMC) %>%
+  do(broom::tidy(lm(y_logFC~x_logFC,data=.)))
+
+rsum_TC<-ecocelmulti2 %>%
+  filter(x_OMC %in% c("Ec_G_C"),
+         y_OMC=="Ec_G_T") %>%
+  group_by(x_OMC) %>%
+  do(broom::glance(lm(y_logFC~x_logFC,data=.)))
+
+
+
+TC_r<-result_TC$r.squared
+TC_i<-gsum_TC[gsum_TC$term=='(Intercept)',]$estimate
+TC_s<-gsum_TC[gsum_TC$term=='x_logFC',]$estimate
+
+
+ecocelmulti %>%
+  filter(x_OMC=="Ec_G_C",
+         y_OMC=="Ec_G_T",
+         z_OMC=="Ec_G_T-C") %>%
+  ggplot(aes(y=y_logFC,x=x_logFC))+
+  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_abline(aes(intercept=1.125,slope=1),color='green4',linetype='longdash')+
+  geom_abline(aes(intercept=TC_i,slope=TC_s),color='red')+
+  geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
+  geom_errorbar(aes(ymin=y_NE,ymax=y_PE),alpha=erralpha,color=errcolor,width=0)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
+  #ggtitle('Scatterplot of metformin and metabolite supplementation effects')+
+  scale_x_continuous(breaks=-10:10) +
+  scale_y_continuous(breaks=-10:10) +
+  geom_point(aes(color=z_logFC))+
+  coord_cartesian(xlim=c(-2,3),ylim = c(-2,3.5))+
+  xlab('Growth logFC vs NGM - Control')+
+  ylab('Growth logFC vs NGM - +50mM Metformin')+
+  labs(color=eccol)+
+  geom_text_repel(aes(label=ifelse(MetaboliteU %in% showmets, as.character(MetaboliteU),"" )), color="black"  )+
+  scale_colour_gradientn(colours = gradcols,
+                         breaks=cbrks,limits=c(-amp,amp),name=eccol)+
+  annotate('text',x = 0.5, y =-2, label = lm_eqn(fit_TC)$Full, parse = TRUE,color ='red',size=4)+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+ggsave(file=paste0(odir,"/Scatter_Control-Treatment_Complete_Selmets_clean_small.pdf"),
+       width=55,height=42,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+# Update simple cor
+ecocelmulti2 %>%
+  filter(x_OMC=="Ec_G_C",
+         y_OMC=="Ec_G_T") %>%
+  ggplot(aes(x=x_logFC,y=y_logFC) )+
+  #geom_rug(size=1,alpha=0.2,color="gray20")+
+  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_abline(aes(slope=1, intercept=0),color='grey',linetype='longdash',size=0.5)+
+  geom_abline(aes(intercept=1.125,slope=1),color='green4',linetype='longdash')+
+  geom_abline(aes(slope=TC_s,
+                  intercept=TC_i),
+              color='red',size=0.5)+
+  geom_errorbar(aes(ymin=y_NE,ymax=y_PE),alpha=erralpha,color=errcolor,width=0)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
+  geom_point(aes(color=ifelse(MetaboliteU %in% showmets,"red","black")),show.legend = FALSE)+
+  scale_color_manual(values = c("black","red"))+
+  xlab('Growth logFC vs NGM - Control')+
+  ylab('Growth logFC vs NGM - +50mM Metformin')+
+  scale_x_continuous(breaks=seq(-5,5,by=1))+
+  scale_y_continuous(breaks=seq(-5,5,by=1))+
+  geom_text_repel(aes(label=ifelse(MetaboliteU %in% showmets, as.character(MetaboliteU),"" ),color=ifelse(MetaboliteU %in% showmets,"red","black")), show.legend = FALSE)+
+  annotate('text',x = 0, y =-2, label = lm_eqn(fit_TC)$Full, parse = TRUE,color ='red',size=4)+
+  coord_cartesian(xlim=c(-2,3),ylim = c(-2,3.5))
+
+
+ggsave(file=paste0(odir,"/Correlations_EcT_EcC.pdf"),
+       width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+# Updated 3e based on nutrient groups
+metgroups <- c('Sign. in E. coli',
+               'Sign. in C. elegans',
+               'Concordant',
+               'Discordant',
+               'N.S.')
+metcolours <- c('blue3','red3','purple3','orange2','gray70')
+
+
+#Itaconic acid, Acetoacetic acid, a-D-Glucose, D-Arabinose, Adenosine, L-serine, D-ribose and glycerol
+
+ecocelmulti2 %>%
+  filter(x_OMC=="Ec_G_T-C", 
+         y_OMC=="Ce_F_T-C") %>%
+  mutate(Metgroup = case_when(x_FDR<0.05 & y_FDR<0.05 & sign(x_logFC) == sign(y_logFC) ~ 'Concordant',
+                              x_FDR<0.05 & y_FDR<0.05 & sign(x_logFC) != sign(y_logFC) ~ 'Discordant',
+                              x_FDR<0.05 & y_FDR>=0.05 ~ 'Sign. in E. coli',
+                              x_FDR>=0.05 & y_FDR<0.05 ~ 'Sign. in C. elegans',
+                              TRUE ~ 'N.S.'),
+         Metgroup = factor(Metgroup, levels = metgroups)) %>%
+  ggplot(aes(x=x_logFC,y=y_logFC,colour=Metgroup))+
+  geom_vline(xintercept = 0,alpha=0.5)+#color='gray70',
+  geom_hline(yintercept = 0,alpha=0.5)+#color='gray70',
+  geom_abline(aes(slope=1,intercept=0),color='gray70',alpha=0.5,linetype='longdash')+
+  geom_vline(xintercept = 1.125,color='green4', linetype='longdash')+
+  geom_abline(aes(slope=TCs,
+                  intercept=TCi),
+              color='red',size=0.5)+
+  geom_errorbar(aes(ymin=y_PE,ymax=y_NE),alpha=erralpha,color=errcolor,width=0)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
+  #geom_point(size=3,alpha=0.6,shape=20)+
+  geom_point(size=3,shape=20)+
+  scale_x_continuous(breaks=seq(-10,10,by=1))+
+  scale_y_continuous(breaks=seq(-10,10,by=1))+
+  xlab('Growth rescue in E. coli, logFC')+
+  ylab('Phenotype rescue in C. elegans, logFC')+
+  geom_text_repel(aes(label=ifelse(MetaboliteU %in% metselection, as.character(MetaboliteU),'')),
+                  size=lblsize,nudge_y = 0.3,force=1,
+                  segment.colour=errcolor,
+                  segment.alpha =segalpha,
+                  show.legend=FALSE)+
+  scale_color_manual(values = metcolours)+
+  # scale_colour_gradientn(colours = gradcols,
+  #                        breaks=cbrks,limits=c(-2,2))+
+  labs(color='Nutrient effect')+
+  coord_cartesian(xlim=c(-2.5,2.5),ylim = c(-1.5,2))+
+  #ggtitle(paste('C. elegans and E. coli phenotype rescue in metformin treatment by metabolites: ',grp,sep='') )+
+  annotate('text',x = 0, y =-1.5, label = lm_eqn(fitTC)$Full, parse = TRUE,color ='red',size=4)+
+  guides(colour = guide_legend(nrow=2))+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "top")
+
+
+ggsave(file=paste0(odir,"/Celegans_Ecoli_effects_solid.pdf"),
+       width=74,height=70,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+metgroups2 <- c('Concordant',
+               'Discordant',
+               'Significant',
+               'N.S.')
+metcolours2 <- c('red3','orange2','blue3','gray70')
+
+ecocelmulti2 %>%
+  filter(x_OMC=="Ec_G_T-C", 
+         y_OMC=="Ce_F_T-C") %>%
+  mutate(Metgroup = case_when(x_FDR<0.05 & y_FDR<0.05 & sign(x_logFC) == sign(y_logFC) ~ 'Concordant',
+                              x_FDR<0.05 & y_FDR<0.05 & sign(x_logFC) != sign(y_logFC) ~ 'Discordant',
+                              x_FDR<0.05 | y_FDR<0.05 ~ 'Significant',
+                              TRUE ~ 'N.S.'),
+         Metgroup = factor(Metgroup, levels = metgroups2)) %>%
+  ggplot(aes(x=x_logFC,y=y_logFC,colour=Metgroup))+
+  geom_vline(xintercept = 0,alpha=0.5)+#color='gray70',
+  geom_hline(yintercept = 0,alpha=0.5)+#color='gray70',
+  geom_abline(aes(slope=1,intercept=0),color='gray70',alpha=0.5,linetype='longdash')+
+  geom_vline(xintercept = 1.125,color='green4', linetype='longdash')+
+  geom_abline(aes(slope=TCs,
+                  intercept=TCi),
+              color='red',size=0.5)+
+  geom_errorbar(aes(ymin=y_PE,ymax=y_NE),alpha=erralpha,color=errcolor,width=0)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
+  #geom_point(size=3,alpha=0.6,shape=20)+
+  geom_point(size=3,shape=20)+
+  scale_x_continuous(breaks=seq(-10,10,by=1))+
+  scale_y_continuous(breaks=seq(-10,10,by=1))+
+  xlab('Growth rescue in E. coli, logFC')+
+  ylab('Phenotype rescue in C. elegans, logFC')+
+  geom_text_repel(aes(label=ifelse(MetaboliteU %in% metselection, as.character(MetaboliteU),'')),
+                  size=lblsize,nudge_y = 0.3,force=1,
+                  segment.colour=errcolor,
+                  segment.alpha =segalpha,
+                  show.legend=FALSE)+
+  scale_color_manual(values = metcolours2)+
+  # scale_colour_gradientn(colours = gradcols,
+  #                        breaks=cbrks,limits=c(-2,2))+
+  labs(color='Nutrient effect')+
+  coord_cartesian(xlim=c(-2.5,2.5),ylim = c(-1.5,2))+
+  #ggtitle(paste('C. elegans and E. coli phenotype rescue in metformin treatment by metabolites: ',grp,sep='') )+
+  annotate('text',x = 0, y =-1.5, label = lm_eqn(fitTC)$Full, parse = TRUE,color ='red',size=4)+
+  guides(colour = guide_legend(nrow=2))+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "top")
+
+
+ggsave(file=paste0(odir,"/Celegans_Ecoli_effects_only_conc_disc_solid.pdf"),
+       width=74,height=70,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+metgroups3 <- c('Concordant rescue',
+                'Concordant aggravate',
+                'Discordant',
+                'Significant',
+                'N.S.')
+metcolours3 <- c('red3','purple2','orange3','blue3','gray70')
+
+ecocelmulti2 %>%
+  filter(x_OMC=="Ec_G_T-C", 
+         y_OMC=="Ce_F_T-C") %>%
+  mutate(Metgroup = case_when(x_FDR<0.05 & y_FDR<0.05 & x_logFC>0 & y_logFC>0 ~ 'Concordant rescue',
+                              x_FDR<0.05 & y_FDR<0.05 & x_logFC<0 & y_logFC<0 ~ 'Concordant aggravate',
+                              x_FDR<0.05 & y_FDR<0.05 & sign(x_logFC) != sign(y_logFC) ~ 'Discordant',
+                              x_FDR<0.05 | y_FDR<0.05 ~ 'Significant',
+                              TRUE ~ 'N.S.'),
+         Metgroup = factor(Metgroup, levels = metgroups3)) %>%
+  ggplot(aes(x=x_logFC,y=y_logFC,colour=Metgroup))+
+  geom_vline(xintercept = 0,alpha=0.5)+#color='gray70',
+  geom_hline(yintercept = 0,alpha=0.5)+#color='gray70',
+  geom_abline(aes(slope=1,intercept=0),color='gray70',alpha=0.5,linetype='longdash')+
+  geom_vline(xintercept = 1.125,color='green4', linetype='longdash')+
+  geom_abline(aes(slope=TCs,
+                  intercept=TCi),
+              color='red',size=0.5)+
+  geom_errorbar(aes(ymin=y_PE,ymax=y_NE),alpha=erralpha,color=errcolor,width=0)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
+  #geom_point(size=3,alpha=0.6,shape=20)+
+  geom_point(size=3,shape=20)+
+  scale_x_continuous(breaks=seq(-10,10,by=1))+
+  scale_y_continuous(breaks=seq(-10,10,by=1))+
+  xlab('Growth rescue in E. coli, logFC')+
+  ylab('Phenotype rescue in C. elegans, logFC')+
+  geom_text_repel(aes(label=ifelse(MetaboliteU %in% metselection, as.character(MetaboliteU),'')),
+                  size=lblsize,nudge_y = 0.3,force=1,
+                  segment.colour=errcolor,
+                  segment.alpha =segalpha,
+                  show.legend=FALSE)+
+  scale_color_manual(values = metcolours3)+
+  # scale_colour_gradientn(colours = gradcols,
+  #                        breaks=cbrks,limits=c(-2,2))+
+  labs(color='Nutrient effect')+
+  coord_cartesian(xlim=c(-2.5,2.5),ylim = c(-1.5,2))+
+  #ggtitle(paste('C. elegans and E. coli phenotype rescue in metformin treatment by metabolites: ',grp,sep='') )+
+  annotate('text',x = 0, y =-1.5, label = lm_eqn(fitTC)$Full, parse = TRUE,color ='red',size=4)+
+  guides(colour = guide_legend(nrow=2))+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        legend.position = "top")
+
+
+ggsave(file=paste0(odir,"/Celegans_Ecoli_effects_only_conc_disc_with_direction_solid.pdf"),
+       width=74,height=70,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
+
+
+ecocelmulti2 %>%
+  filter(x_OMC=="Ec_G_T-C", 
+         y_OMC=="Ce_F_T-C") %>%
+  filter(x_logFC< -2) %>%
+  View
+
+
+# Update Gradient
+ecocelmulti %>%
+  filter(x_OMC=="Ec_G_T-C",
+         y_OMC=="Ce_F_T-C",
+         z_OMC=="Ce_F_T-C") %>%
+  ggplot(aes(y=y_logFC,x=x_logFC))+
+  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
+  geom_abline(aes(intercept=TCi,slope=TCs),color='red')+
+  geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
+  geom_vline(xintercept = 1.125,color='green4', linetype='longdash')+
+  geom_errorbar(aes(ymin=y_NE,ymax=y_PE),alpha=erralpha,color=errcolor,width=0)+
+  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
+  #ggtitle('Scatterplot of metformin and metabolite supplementation effects')+
+  scale_x_continuous(breaks=-10:10) +
+  scale_y_continuous(breaks=-10:10) +
+  geom_point(aes(color=z_logFC))+
+  coord_cartesian(xlim=c(-2.5,2.5),ylim = c(-1.5,2))+
+  xlab('Growth rescue in E. coli, logFC')+
+  ylab('Phenotype rescue in C. elegans, logFC')+
+  labs(color=cecol)+
+  geom_text_repel(aes(label=ifelse(MetaboliteU %in% showmets, as.character(MetaboliteU),"" ),color=z_logFC), show.legend = FALSE )+
+  scale_colour_gradientn(colours = gradcols,
+                         breaks=cbrks,limits=c(-amp,amp),name=cecol)+
+  annotate('text',x = 0, y =-1.5, label = lm_eqn(fitTC)$Full, parse = TRUE,color ='red',size=4)+
+  theme(panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+ggsave(file=paste0(odir,"/Celegans_Ecoli_Ce_gradient.pdf"),
+       width=84,height=70,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
+
+
 #C elegans, E coli comparison - pole 
 
 xmin<- -3
@@ -520,10 +835,10 @@ metselection<-c('alpha-D-Glucose',
            'D-Ribose',
            'D-Arabinose',
            'L-Serine',
-           'L-Proline',
            'Adenosine',
            'Acetoacetic Acid',
-           'Itaconic Acid')
+           'Itaconic Acid',
+           'Glycerol')
 
 
 
@@ -535,8 +850,6 @@ compdata<-ecocelmulti2 %>%
 
 fitTC<-lm(y_logFC~x_logFC,data=compdata)
 resultTC<-summary(fitTC)
-
-
 
 
 
@@ -597,6 +910,9 @@ ecocelmulti2 %>%
 
 ggsave(file=paste0(odir,"/Celegans_Ecoli_effect_correlation_Complete_Selection.pdf"),
        width=110,height=82,units='mm',scale=2,device=cairo_pdf,family="Arial")
+
+
+
 
 
 
@@ -879,6 +1195,8 @@ ggsave(file=paste0(odir,"/Correlations_CeF_EcC_rug.pdf"),
 
 
 
+
+
 ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_T",
          y_OMC=="Ce_F_T-C") %>%
@@ -948,8 +1266,6 @@ tsum<-ectimem %>%
   summarise(Mean=mean(OD),SD=sd(OD),SE=SD/sqrt(length(OD))) %>%
   left_join(info) %>%
   mutate(Organism='E. coli')
-
-
 
 
 
