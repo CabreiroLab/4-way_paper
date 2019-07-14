@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(broom)
 library(ggrepel)
@@ -68,13 +69,6 @@ data.sum<-data %>%
          PrcNE=2^NE*100,
          PrcPE=2^PE*100)
 
-
-
-
-data %>%
-  select(-c(NormName,MeasName,MeasShort)) %>%
-  write_csv(paste0(odir,"/Raw_data_Summary.csv"))
-  
   
 data_ts<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Mutants/Data.csv') %>%
   filter(Data=='600nm_f') %>%
@@ -85,14 +79,6 @@ data_ts<-read_csv('Resistance_mutants_growth_assays/2017-Rosie_Mutants/Data.csv'
          Strain=factor(Strain,levels=strainlist),
          Time_s=as.numeric(Time_s),
          Time_h=Time_s/3600)
-
-
-
-data_ts %>%
-  group_by(Strain,Replicate,TReplicate,Metformin_mM) %>%
-  summarise(Count=n()) %>%
-  View
-
 
 
 Metcols <- colorRampPalette(c("red", "blue4"))(6)
@@ -186,21 +172,8 @@ stat<-data %>%
          PrcPE=2^PE*100,
          pStars=pStars(p.value)) 
 
-# Metformin_mM=str_extract(term,'[[:digit:]]{1,3}'),
-# Metformin_mM=factor(Metformin_mM,levels=metf ),
-
-
 stat %>%
   write_csv(paste0(odir,"/Stats_Summary.csv"))
-
-
-View(stat)
-
-
-stat %>%
-  filter(Measure=='AUC' & Normalisation=="Norm_CM" & Metformin_mM=='150')
-
-
 
 
 stat %>%

@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(broom)
 library(ggrepel)
@@ -69,10 +70,6 @@ data<-read_csv('TF/Data/Summary.csv') %>%
   mutate(Value=ifelse(Value %in% c(Inf,-Inf),NA,Value ))
 
 
-data %>%
-  filter(is.infinite(Value))
-
-
 data.sum<-data %>%
   group_by(Measure,Normalisation,Strain,Metformin_mM,NormName,MeasName,MeasShort) %>%
   summarise(Mean=mean(Value),
@@ -107,13 +104,6 @@ data_ts<-read_csv('TF/Data/Data.csv') %>%
          Strain=factor(Strain,levels=strainlist),
          Time_s=as.numeric(Time_s),
          Time_h=Time_s/3600)
-
-
-
-data_ts %>%
-  group_by(Strain,Replicate,TReplicate,Metformin_mM) %>%
-  summarise(Count=n()) %>%
-  View
 
 
 
@@ -209,11 +199,6 @@ stat<-data %>%
          pStars=pStars(p.value)) 
 
 
-stat %>% 
-  filter(Normalisation=='Norm_C' & Measure=='logAUC' & Strain=='crp')
-
-
-
 stat2<-data %>%
   filter(Measure=="logAUC" & Normalisation=="Value") %>%
   do(tidy(lm(Value~Strain*Metformin_mM,data=.))) %>%
@@ -227,22 +212,8 @@ stat2<-data %>%
   ungroup
 
 
-
-
-# Metformin_mM=str_extract(term,'[[:digit:]]{1,3}'),
-# Metformin_mM=factor(Metformin_mM,levels=metf ),
-
-
 stat %>%
   write_csv(paste0(odir,"/Stats_Summary.csv"))
-
-
-View(stat)
-
-
-stat %>%
-  filter(Measure=='AUC' & Normalisation=="Norm_CM" & Metformin_mM=='150')
-
 
 
 
@@ -266,16 +237,6 @@ stat %>%
 
 ggsave(file=paste(odir,"/Growth_Comparison_vs_OP50-C_Control.pdf",sep=''),
              width=120,height=60,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
-# Straincols <- c("red","blue4", colorRampPalette(c("orange", "black"))(6))
-# Straincols <- c("red4","blue4", rainbow(6))
-# Straincols <- c("red4","blue4", terrain.colors(6))
-
-# Straincols <- c("red","blue", viridis::viridis(8,option="inferno"))
-# names(Straincols) <- strainlist
-# Strainlab<-"Strain"
-
 
 
 Straincols<-ggthemes::tableau_color_pal(palette = "tableau20")(12)
@@ -344,16 +305,6 @@ PlotComp2<-function(data,stars,measname) {
 
 
 
-#"OP50-C",& ! Strain %in% c("crp","cra","argR","ntrC")
-# data.sum %>%
-#   filter(Normalisation=="Norm_CM" & Measure=="logAUC" ) %>% 
-#   PlotComp2(.,stat %>% filter(!Strain %in% c("crp","cra","argR","ntrC") & Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"),unique(as.character(.$MeasShort)) )+
-#   ylab("Growth AUC vs OP50-C Control, %" )
-# 
-# ggsave(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_logAUC_SD.pdf"),
-#        width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial")
-
-
 data.sum %>%
   filter(Normalisation=="Norm_CM" & Measure=="logAUC") %>%
   PlotComp(filter(stat,Measure=='logAUC', Normalisation=="Norm_C"),'Growth AUC' )
@@ -363,9 +314,6 @@ ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_logAUC_fi
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-levels(data.sum$Strain)
-
-
 MRdata<-read_csv('Summary_resistance/Data_Summary.csv') %>%
   filter(Strain=='OP50-MR')%>%
   mutate(Metformin_mM=factor(Metformin_mM,levels=metf))
@@ -373,15 +321,6 @@ MRdata<-read_csv('Summary_resistance/Data_Summary.csv') %>%
 MRstat<-read_csv('Summary_resistance/Stats_Summary.csv') %>%
   filter(Strain=='OP50-MR') %>%
   mutate(Metformin_mM=factor(Metformin_mM,levels=metf))
-
-
-
-
-colnames(MRdata)
-colnames(stat)
-
-head(MRdata)
-head(stat)
 
 
 strainlist.new<-c('OP50-C','OP50-MR','crp','cra','argR','ntrC','arcA','csiR','fur','gcvA','marA','mlc','nac')
@@ -407,10 +346,6 @@ data.sum<-data.sum %>%
 
 
 FS6<-c('OP50-C','arcA','csiR','fur','gcvA','marA','mlc','nac')
-
-
-stat %>%
-  filter(Strain=='OP50-MR')
 
 
 
@@ -494,11 +429,6 @@ ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_Fig6.pdf"
        width=35,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-
-
-
-
-
 FT<-c('OP50-C','crp','cra','argR','ntrC')
 
 data.sum %>%
@@ -510,20 +440,6 @@ data.sum %>%
 
 ggsave(file=paste(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_Thesis.pdf",sep=''),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
-
-
-
-# Compplots<-data.sum %>%
-#   filter(Normalisation=="Norm_CM" & Measure!="AUC") %>%
-#   group_by(Measure) %>%
-#   do(plot=PlotComp(.,stat %>% filter(Measure==unique(as.character(.$Measure)), Normalisation=="Norm_C"), unique(as.character(.$MeasShort)) ) )
-# 
-# 
-# map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_condensed_",as.character(Compplots$Measure),"_SD.pdf"),
-#      Compplots$plot,
-#      width=55,height=41,scale=2,units ='mm',device=cairo_pdf,family="Arial",ggsave)
 
 
 
@@ -547,11 +463,6 @@ Compwrap<-data.sum %>%
 map2(paste0(odir,"/Growth_comparison_vs_OP50-C_Control_",as.character(Compwrap$Measure),"_SD.pdf"),
      Compwrap$plot,
      width=110,height=41,units ='mm', scale=2,device=cairo_pdf,family="Arial",ggsave)
-
-
-
-
-
 
 
 

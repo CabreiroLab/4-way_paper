@@ -56,17 +56,6 @@ library(PFun)
 theme_set(theme_light())
 
 
-#In code should be replaced with rowbind or similar alternative
-# mymerge<-function(all.results,results) {
-#   if (dim(all.results)[[1]]==0) {
-#     all.results<-results
-#   } else {
-#     all.results<-merge(all.results,results,all.x=TRUE,all.y=TRUE)
-#   }
-#   return(all.results)
-# }
-
-
 cwd<-"~/Dropbox/Projects/2015-Metformin/RNAseq/Celegans_metformin/"
 keggxml<-'~/Dropbox/Projects/2015-Metformin/Annotations/Celegans/KEGG_pathways/'
 setwd(cwd)
@@ -90,13 +79,6 @@ celegans.annotation <- getBM(attributes=c('ensembl_transcript_id','ensembl_gene_
                              mart = celegans87)
 
 
-
-
-head(celegans.annotation)
-dim(celegans.annotation)
-
-
-
 #Get clean read counts
 cnts.gaf.o<-read.table('Results/Raw_data_for_genes.csv',sep = ',',header = TRUE)
 cnts.gaf.o$EntrezProt<-NULL
@@ -108,15 +90,7 @@ cnts.gaf.o<-rename(cnts.gaf.o,c('EntrezGene'='entrezgene'))
 #Use ENSEMBL transcript IDs (WormBase IDs) for annotations
 cnts.gaf.o$ensembl_transcript_id<-ifelse(grepl('transcript',cnts.gaf.o$t_name), gsub('transcript:','',cnts.gaf.o$t_name),NA  ) 
 
-
-head(cnts.gaf.o)
-dim(cnts.gaf.o)
-
 cnts.gaf<-merge(cnts.gaf.o,celegans.annotation,by='ensembl_transcript_id',all.x=TRUE,all.y=FALSE)
-
-
-dim(cnts.gaf)
-head(cnts.gaf)
 
 ancols<-c('ensembl_transcript_id','ensembl_gene_id','t_id','gene_id','external_gene_name','entrezgene','description','chr','strand','start','end','num_exons','length')
 
@@ -125,13 +99,6 @@ gene.info<-cnts.gaf[,ancols]
 gene.data<-cnts.gaf[,as.character(pheno_data$ids)]
 
 raw.data<-cnts.gaf[,c("gene_id","ensembl_gene_id",as.character(pheno_data$ids))]
-
-
-colnames(cnts.gaf)
-
-colnames(raw.data)
-
-
 
 ids<-as.character(pheno_data$ids)
 
@@ -148,16 +115,6 @@ write.csv(raw.data,paste0(odir,"/Raw_clean_gene_data.csv"))
 
 
 
-
-
-
-
-table(!is.na(gene.info$entrezgene))
-
-
-head(gene.info)
-head(gene.data)
-
 groups<-c('C','C','C','C','M','M','M','M','R','R','R','R','RM','RM','RM','RM')
 
 
@@ -172,8 +129,6 @@ dt<-DGEList(counts=gene.data,
 
 #How to choose right threshold
 
-dim(dt)
-apply(dt$counts, 2, sum)
 #At least one count per million (cpm) reads in at least 4 consistent samples (one group)
 
 thrs<- 0
@@ -232,11 +187,7 @@ dev.copy2pdf(device=cairo_pdf,
 
 #Batch removal
 logCPM <- cpm(d, log=TRUE, prior.count=1)
-batch<-c('1','1','2','2',
-         '1','2','2','2',
-         '1','2','2','2',
-         '1','1','2','2')
-logCPMc <- removeBatchEffect(logCPM, batch)
+logCPMc <- removeBatchEffect(logCPM, pheno_data$Batch)
 
 plotMDS(logCPMc, col=as.numeric(d$samples$group))
 legend("bottomleft", as.character(unique(d$samples$group)), col=1:4, pch=1)
@@ -286,13 +237,6 @@ dev.copy2pdf(device=cairo_pdf,
              width=9,height=9, useDingbats=FALSE)
 
 
-
-
-#GLM tests
-# batch.lvl<-c('1','1','2','2',
-#                     '1','2','2','2',
-#                     '1','2','2','2',
-#                     '1','1','2','2')
 design.mat <- model.matrix(~ 0 + d$samples$group+pheno_data$Batch) #
 colnames(design.mat) <- c(levels(d$samples$group),'Batch')
 
@@ -448,15 +392,7 @@ all.results$Comparison<-factor(all.results$Comparison,
                                levels=allcomp,
                                labels=allcomp)
 
-# 
-# all.results$Comparison<-factor(all.results$Comparison,
-#                                levels=c('SM-S','RM-R','SM-S-(RM-R)','R-S','T-C_general','R-S_general','S-R_general'),
-#                                labels=c('SM-S','RM-R','SM-S-(RM-R)','R-S','T-C_general','R-S_general','S-R_general'))
-
-
-
 all.results<-data.frame(all.results)
-dim(all.results)
 
 
 #Get gene pathway mappings
@@ -464,7 +400,6 @@ path2eg<-getGeneKEGGLinks('cel',convert = TRUE)
 path2eg<-subset(path2eg,!is.na(GeneID) & !is.na(PathwayID) & PathwayID!='path:cel01100')
 path2eg$PathID<-gsub('path:','',path2eg$PathwayID)
 path2eg$entrezgene<-path2eg$GeneID
-#head(path2eg)
 
 
 path2pathde<-getKEGGPathwayNames('cel',remove.qualifier = TRUE)
@@ -474,7 +409,6 @@ go2eg<-toTable(org.Ce.egGO2EG)
 go2eg<-subset(go2eg,!is.na(gene_id) & !is.na(go_id) )
 go2eg$GO_id<-go2eg$go_id
 go2eg$entrezgene<-go2eg$gene_id
-#head(go2eg)
 
 
 allKEGGinfo.genes<-ddply(path2eg,.(PathID),summarise,Genes=paste(entrezgene,collapse=';'))
@@ -491,20 +425,12 @@ all.results.kg<-merge(all.results.k,allGOinfo.terms,by='entrezgene',all.x=TRUE)
 options(scipen=5)
 
 
-
-
 write.csv(all.results.kg,paste(odir,'/All_results.csv',sep = ''),row.names = FALSE)
-
-
-
 write.csv(all.KEGGenrichment,paste(odir,'/All_results_KEGG.csv',sep = ''),row.names = FALSE)
-
-
-
 write.csv(all.GOenrichment,paste(odir,'/All_results_GO.csv',sep = ''),row.names = FALSE)
 
 
-# 
+#  Load results and continue
 # cwd<-"~/Projects/2015-Metformin/RNAseq/Celegans_metformin/"
 # keggxml<-'~/Projects/2015-Metformin/Annotations/Celegans/KEGG_pathways/'
 # setwd(cwd)
@@ -518,7 +444,6 @@ write.csv(all.GOenrichment,paste(odir,'/All_results_GO.csv',sep = ''),row.names 
 # all.GOenrichment<-read.table(paste(odir,'/All_results_GO.csv',sep = ''),header = TRUE,sep=',')
 
 
-dim(all.results.kg)
 
 annotations<-c('KEGG','GO')
 
@@ -564,9 +489,6 @@ comp.list<-list('Main'=comp.main,'General'=comp.gen)
 add.path<-c('cel04213','cel04212')
 allpaths<-c()
 
-setwd(cwd)
-
-
 
 c('ensembl_transcript_id','ensembl_gene_id','t_id','gene_id','external_gene_name','entrezgene','description','chr','strand','start','end','num_exons','length')
 
@@ -591,8 +513,6 @@ for (thres in c('None')) {
   all.results.rcp<-dcast(all.results.rmc,t_id+ensembl_transcript_id+ensembl_gene_id+external_gene_name+entrezgene+Pathways+GO_terms+
                            chr+strand+start+end+num_exons+length~Comparison+Stat,value.var = 'Value')
 
-  #head(all.results.rcp)
-  
   #Reorder by significance
   signsum<-apply(all.results.rcp[,grep('FDR',colnames(all.results.rcp))],1,function(x) sum(-log10(x)))
   all.results.rcp<-all.results.rcp[order(signsum,decreasing = TRUE),]
@@ -752,9 +672,6 @@ all.results.rcp<-dcast(all.results.rmc,t_id+gene_name+entrezgene+ENSEMBL+ENSEMBL
                          chr+strand+start+end+num_exons+length~Comparison+Stat,value.var = 'Value')
 
 
-
-
-
 #For metabolic modeling
 #Choose only the necessary comparisons
 all.results.model<-subset(all.results.rmc,Comparison %in% c('SM-S','RM-R','R-S','RM-SM','RM-S','SM-R') & gene_name!='.')
@@ -771,8 +688,6 @@ all.results.model$Comparison<-revalue(all.results.model$Comparison,c('SMxS'='SxS
                                                                      'RMxS'='SxRM',
                                                                      'SMxR'='RxSM'))
 
-unique(all.results.model$Comparison)
-
 
 all.results.model$Stat<-gsub('logFC','fc',all.results.model$Stat)
 all.results.model$Stat<-gsub('FDR','padj',all.results.model$Stat)
@@ -782,31 +697,9 @@ all.results.model$Stat<-factor(all.results.model$Stat,levels=c('padj','fc'),labe
 
 all.results.modelc<-dcast(all.results.model,gene_name+entrezgene+EntrezProt~Comparison+Stat,value.var = 'Value')
 
-
-dim(all.results.modelc)
-
-colnames(all.results.modelc)[4:15]<-gsub('_','',colnames(all.results.modelc)[4:15])
-
-head(all.results.modelc)
-
-
 sample<-read.csv('../../Metabolic_models/Celegans/sample-data.csv',sep='\t')
 sample$external_gene_id<-as.character(sample$external_gene_id)
 sample$ensembl_gene_id<-as.character(sample$ensembl_gene_id)
-dim(sample)
-
-
-all.results.modelc$EntrezProt
-
-
-
-all.results.modelc$EntrezProtClean
-
-
-length(intersect(sample$external_gene_id,all.results.modelc$gene_name))
-length(intersect(sample$ensembl_gene_id,all.results.modelc$gene_name))
-length(intersect(sample$ensembl_gene_id,all.results.modelc$EntrezProt))
-
 
 
 all.results.modelc$CK_external_gene_id<-NA
@@ -824,38 +717,12 @@ table(is.na(all.results.modelc$CK_external_gene_id))
 #Match by CK ensemble and Entrez
 match.CKEP<-match(all.results.modelc$EntrezProt,sample$ensembl_gene_id)
 all.results.modelc$CK_external_gene_id<-ifelse(is.na(all.results.modelc$CK_external_gene_id),sample$external_gene_id[match.CKEP],all.results.modelc$CK_external_gene_id)
-table(is.na(all.results.modelc$CK_external_gene_id))
-
-table(is.na(all.results.modelc$CK_external_gene_id))
-
-
-subset(all.results.modelc,EntrezProt=='D1009.1a')
-
-
-
-length(colnames(all.results.modelc))
 
 all.results.modelc<-all.results.modelc[,c('CK_external_gene_id',colnames(all.results.modelc)[1:15])]
 
 gnid<-read.table('../../Metabolic_models/Celegans/genelist.txt',header=FALSE)
-colnames(gnid)<-c('Gene_id')
-
-colnames(all.results.modelc)
-
-
-length(intersect(gnid$Gene_id,all.results.modelc$CK_external_gene_id))
-length(intersect(gnid$Gene_id,all.results.modelc$gene_name))
-length(intersect(gnid$Gene_id,all.results.modelc$entrezgene))
-
-intersect(gnid$Gene_id,all.results.modelc$EntrezProtClean)
-
-
-View(subset(all.results.modelc,EntrezProt %in% intersect(gnid$Gene_id,all.results.modelc$EntrezProt)))
-
 
 write.table(matches[,c('CK_external_gene_id','gene_name','entrezgene','EntrezProt')],'../../Metabolic_models/Celegans/Fixed_matches.csv',sep='\t',row.names = FALSE,quote = FALSE)
-
-
 write.table(all.results.modelc,'../../Metabolic_models/Celegans/Celegans_metformin_RNAseq.csv',sep='\t',row.names = FALSE,quote = FALSE)
 
 
@@ -916,11 +783,6 @@ write.csv(all.kegg.mappings,paste(odir,'/All_KEGG_mappings.csv',sep = ''),row.na
 
 
 
-
-
-
-
-
 #Venn
 library('Vennerable')
 #Might need to deactive reshape and Vennerable to use melt in other code
@@ -951,7 +813,6 @@ venn.change<-list('SM-S'=S.change,
             'RM-R'=R.change)
 
 
-subset(all.results.rcp,t_id %in% downs)[,'gene_name']
 
 plot(Venn(venn.groups),show = list(Faces = FALSE),
      doWeights = FALSE,type='ellipses')
@@ -984,12 +845,6 @@ fit<-lm(`RM-R_logFC`~`SM-S_logFC`,data=all.results.rcp)
 res<-summary(fit)
 res
 res$r.squared
-
-
-dim(subset(all.results.rcp,sqrt( (`SM-S_logFC`*1.5)^2+(`RM-R_logFC`)^2 ) >5 &
-             (`SM-S_FDR`<0.05 |
-             `RM-R_FDR`<0.05) ))
-
 
 
 library(ellipse)
@@ -1034,9 +889,6 @@ cbrks<-seq(-amp,amp,by=3.5)
 gradcols<-c('blue2','blue2','gray80','red2','red2')
 
 
-
-subset(all.results.rcp,gene_name=='acs-2')
-
 ggplot(all.results.rcp,aes(x=`SM-S_logFC`,y=`RM-R_logFC`))+
   geom_vline(xintercept = 0,alpha=0.2)+
   geom_hline(yintercept = 0,alpha=0.2)+
@@ -1058,222 +910,3 @@ ggplot(all.results.rcp,aes(x=`SM-S_logFC`,y=`RM-R_logFC`))+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Scatter_SensRes_longevity.pdf",sep=''),
              width=7,height=4,useDingbats=FALSE)
-
-
-all<-1529+754+953
-
-(1529+953)/all
-
-13/all
-
-head(all.results.rcp)
-
-
-
-
-#Garbage
-# compare (group 2 - group 1) to 0:
-# this is equivalent to comparing group 1 to group 2
-lrt12 <- glmLRT(fit, contrast=contrasts[['SM-S']])#Specific treatment effect
-
-
-#lrt12 <- glmLRT(fit, contrast=c(-1,1,1,-1,0))#Lifespan
-
-de12.glm <- decideTestsDGE(lrt12, adjust.method="BH", p.value = 0.05)
-summary(de12.glm)
-de2tags12 <- rownames(d2)[as.logical(de12.glm)]
-plotSmear(lrt12, de.tags=de2tags12)
-abline(h = c(-1, 1), col = "blue")
-
-View(topTags(lrt12, n=30))
-
-
-#subset(full_table,gene_id %in% c('MSTRG.18297'))
-
-# getGeneKEGGLinks('cel',convert = TRUE)
-# getKEGGPathwayNames('cel',remove=TRUE)
-
-gp<-subset(getGeneKEGGLinks('cel',convert = TRUE),!is.na(GeneID) & ! is.na(PathwayID) & PathwayID!='path:cel01100')
-
-#lrt12$genes$entrezgene
-
-keg12<-kegga(lrt12,geneid = 'entrezgene',coef='logFC',convert=TRUE,
-             species.KEGG='cel',FDR=0.05,gene.pathway=gp.KEGG,trend='length')
-
-topKEGG(keg12)
-
-keg12$Comparison<-'SM/S'
-
-
-#writre script to compare gene numbers from enrichment and in table
-
-
-go12<-goana(lrt12,species='Ce',geneid='entrezgene',convert=TRUE,FDR=0.05)
-
-
-View(topGO(go12,n=50))
-
-#df residual needs to be 11!
-
-# 
-biocLite(c("Rgraphviz", "png", "KEGGgraph", "org.Hs.eg.db"))
-biocLite("pathview")
-#biocLite("gage")
-
-
-
-# source("http://bioconductor.org/biocLite.R")
-# biocLite(c("pathview"))
-
-
-
-
-
-
-#Pathview
-
-
-
-gdata<-subset(all.results.rcp,Comparison=='SM-S' & Threshold=='None' & ! is.na(entrezgene))
-
-nrow(all.results.rcp)
-gdata<-subset(all.results.rcp,! is.na(entrezgene))
-
-
-nrow(gdata)
-o<-order(gdata[,'SM-S_FDR'],decreasing=FALSE)
-gdata<-gdata[o,]
-
-
-head(gdata)
-
-mapkey<-'entrezgene'
-
-#Do selection by gene id, because gene_id is associated with function
-dupl<-duplicated(gdata[,mapkey])
-table(dupl)
-
-gdataf<-gdata[!dupl,]
-rownames(gdataf)<-gdataf[,mapkey]
-nrow(gdataf)
-
-#gdatam<-as.matrix(gdataf[,'logFC',drop=FALSE])
-
-head(gdataf)
-
-
-i<-1
-
-setwd(cwd)
-
-odir<-paste('/Pathview_test',sep='')
-
-ecoxml<-'~/Projects/2015-Metformin/Annotations/Ecoli/KEGG_pathways/'
-
-
-download.kegg(pathway.id = allpaths,species = 'eco',kegg.dir = keggxml)
-
-
-
-
-
-allpaths<-gsub('cel','',allKEGGinfo.genes$PathID)
-
-
-
-
-pv.out <- pathview(gene.data = gdataf[,c('SM-S_logFC','RM-R_logFC','SM-S-(RM-R)_logFC'),drop=FALSE],
-                   pathway.id = "00010",species = "cel",
-                   kegg.dir = "KEGG_pathways_Celegans",
-                   out.suffix = "comparison",
-                   same.layer=FALSE,kegg.native = T,map.symbol=FALSE,
-                   map.null=FALSE,new.signature=FALSE, plot.col.key=TRUE,
-                   res=300,
-                   low = list(gene = "blue", cpd = "green"),
-                   mid=list(gene = "gray", cpd = "gray"),
-                   high = list(gene = "red", cpd ="yellow"),
-                   limit=list(gene=1,cpd=1),node.sum = "mean",
-                   trans.fun = list(gene=NULL,cpd=NULL))
-
-
-
-
-# keggdir<-paste("~/Projects/2015-Metformin/Sequencing/CElegans/",odir,sep='')
-# dir.create(keggdir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
-
-# setwd(keggdir)
-
-
-
-
-pv.out <- pathview(gene.data = gse16873.d[, 1], pathway.id = demo.paths$sel.paths[i],
-                   species = "hsa", out.suffix = "gse16873", kegg.native = T)
-
-
-pv.out <- pathview(gene.data = gdataf[,'logFC',drop=FALSE], pathway.id = "cel00020",
-                   species = "cel", out.suffix = "test",kegg.native = T,map.symbol=TRUE,
-                   new.signature=FALSE,plot.col.key=TRUE)#, ,gene.idtype='ENSEMBLPROT',gene.idtype='entrez'
-
-
-
-pv.out <- pathview(gene.data = gdataf[,c('SM-S_logFC','RM-R_logFC','SM-S-(RM-R)_logFC'),drop=FALSE],
-                   pathway.id = "04212",species = "cel", out.suffix = "comparison",
-                   same.layer=FALSE,kegg.native = T,map.symbol=FALSE,
-                   map.null=FALSE,new.signature=FALSE, plot.col.key=TRUE,
-                   res=300,
-                   low = list(gene = "blue", cpd = "green"),
-                   mid=list(gene = "gray", cpd = "gray"),
-                   high = list(gene = "red", cpd ="yellow"),
-                   limit=list(gene=2,cpd=2),node.sum = "mean",
-                   trans.fun = list(gene=NULL,cpd=NULL))
-
-pv.out
-
-
-
-
-pv.out
-
-#pv.out
-
-
-min(gdataf[,c('SM-S_logFC','RM-R_logFC','SM-S-(RM-R)_logFC'),drop=FALSE])
-max(gdataf[,c('SM-S_logFC','RM-R_logFC','SM-S-(RM-R)_logFC'),drop=FALSE])
-
-#,,gene.idtype="entrez"
-#gene.annotpkg='org.Ce.eg.db'
-
-subset(gdataf,ForKEGG=='CELE_F20H11.3')
-subset(all.results.kg,EntrezProt=='F54H12.1')
-
-pv.out
-
-data(gene.idtype.list)
-gene.idtype.list
-
-
-
-path2eg<-getGeneKEGGLinks('cel',convert = TRUE)
-path2eg<-subset(path2eg,!is.na(GeneID))
-
-subset(path2eg,is.na(GeneID))
-
-path2eg$PathID<-gsub('path:','',path2eg$PathwayID)
-path2eg$entrezgene<-path2eg$GeneID
-head(path2eg)
-
-
-dim(path2eg)
-
-length(unique(all.results.kg$entrezgene))
-
-length(intersect(unique(all.results.kg$entrezgene),path2eg$entrezgene))
-
-head(path2eg)
-
-
-allTCA<-subset(path2eg,PathID=='cel01200')
-dim(allTCA)
-
-
-

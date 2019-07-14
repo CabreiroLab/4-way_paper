@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 
 #devtools::install_github("PNorvaisas/PFun")
@@ -72,27 +73,6 @@ data.all<-data.frame(Type=c("RNAseq","CRP","Glycerol"),Folder=c("RNAseq","crp-cr
   select(-`Type == "Glycerol"`)
 
 
-
-
-unique(data.all$Gene)
-unique(data.all$Strain)
-unique(data.all$SGroup)
-unique(data.all$Supplement)
-
-
-data.all %>%
-  filter(Type %in% c("CRP",'RNAseq') & Measure=='Log' & Gene=='fat-7' & Metformin_mM==50 & Strain=="OP50-C" & NormAbs<2^6)
-
-
-
-
-data.all %>%
-  filter(Measure=='Log' & Gene=='acs-2' & Type=="Glycerol") %>%
-  View
-
-head(data.all)
-
-
 data.all %>%
   write_csv('All_raw_data_updated.csv')
 
@@ -103,12 +83,3 @@ data.all %>%
   group_by(Type,Gene,Replicate,Strain,Supplement,Metformin_mM) %>%
   summarise(Count=n()) %>%
   write_csv('All_data_Worm_count.csv')
-
-
-
-# data.all %>%
-#   group_by(Condition) %>%
-#   summarise %>%
-#   write_csv('Conditions_raw_all.csv')
-
-

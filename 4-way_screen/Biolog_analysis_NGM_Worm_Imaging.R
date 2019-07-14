@@ -19,9 +19,6 @@ library(gridExtra)
 
 library(plot3D)
 
-# library(rgl)
-# library(pca3d)
-
 library(multcomp)
 library(contrast)
 library(scales)
@@ -41,9 +38,6 @@ MinMeanSDMMax <- function(x) {
   names(v) <- c("ymin", "lower", "middle", "upper", "ymax")
   v
 }
-
-
-
 
 
 
@@ -80,15 +74,8 @@ theme_Publication <- function(base_size=14) {
 
 theme_set(theme_Publication())
 
-
-
-#theme_set(theme_light())
-
 theme_update(panel.background = element_rect(colour = "black"),
              axis.text = element_text(colour = "black"))
-
-
-
 
 
 setwd("~/Dropbox/Projects/2015-Metformin/Biolog_Met_NGM/Celegans/")
@@ -128,16 +115,9 @@ info.b<-info %>%
          Metabolite_Uniq=ifelse(Index=='PM4A-F1','NGM_S',Metabolite_Uniq))
   
 
-subset(info.b,Metabolite %in% dupls)
-
-head(info)
-subset(info.b,Metabolite=='Negative Control')
-head(info)
-
 dupmet<-data.frame(table(as.character(info.b$Metabolite_Uniq)))
 
 dupls<-dupmet[dupmet$Freq>1,'Var1']
-dupls
 
 subset(info.b,Metabolite_Uniq %in% dupls)
 
@@ -150,16 +130,11 @@ ref.c<-rbind(ref.cA,ref.cB)
 
 info<-merge(info.b,ref.c,all=TRUE)
 
-View(info)
-
-
-
+#Specks picked up in analysis
 artefacts<-read.xlsx2('Artefacts_new.xlsx',sheetName = 'Artefacts')
 
 
 data.raw<-read.csv('Summary_all_new_auto_threshold.csv',sep='\t',header=TRUE,check.names = FALSE)
-
-
 
 data.ctr<-read.csv('Summary_controls_All_auto_threshold.csv',sep='\t',header=TRUE,check.names = FALSE)
 
@@ -185,46 +160,19 @@ for (a in 1:nrow(artefacts)){
 }
 
 
-
-
-
-
-subset(data,Plate=='Controls')[,c('Replicate','Plate','Well','Worm')]
-
-
-table(data$Replicate)
-
-
-head(data)
-
-
-#colnames(data)<-gsub('X','',colnames(data))
 #Remove zero pixels
 
 data.c<-data[,!grepl('0.000',colnames(data))]
-
 
 
 #All brightness levels
 brights<-setdiff(colnames(data.c),c('Replicate','Plate','Well','File','Worm'))
 
 
-
 data.ca<-data.c %>%
   merge(info[,c('Plate','Well','Index','Metabolite','Metabolite_Uniq','Group')],by=c('Plate','Well'),all.x=TRUE) %>%
   mutate(Row=as.character(gsub("[[:digit:]]", "", Well)),
          Col=as.numeric(gsub("[[:alpha:]]", "", Well)))
-
-
-head(data.ca)
-
-data.ca$Index
-
-subset(data.ca,is.na(Index))[,c('Replicate','Plate','Well','Index','File','Worm','Metabolite','Metabolite_Uniq')]
-
-subset(data.ca,grepl('NGM',File))[,c('Replicate','Plate','Well','Index','File','Worm','Metabolite','Metabolite_Uniq')]
-
-table(data.ca$Metabolite_Uniq)
 
 
 
@@ -239,24 +187,12 @@ data.l<-data.ca %>%
 
 
 
-subset(data.l,Plate=='Controls')
-
-min(data.l$Brightness)
-
-
 
 #Make explicit long table from Freq table
 #Can take some time
 data.m<-data.l %>%
   ddply(.(Replicate,Plate,Well,Row,Col,Index,File,Worm,Metabolite,Metabolite_Uniq,Group),plyr::summarise,Brightness=rep(Brightness,Frequency) ) %>%
   mutate(BrightnessLog=log2(Brightness))
-
-dim(data.m)
-head(data.m)
-
-
-table(data.m$Replicate)
-
 
 
 ggplot(data.m,aes(x=BrightnessLog))+
@@ -303,12 +239,6 @@ ref<-plyr::rename(ref,c('Raw'='Ref'))
 #Summarise over all worms
 ref.rp<-ddply(ref,.(Replicate,Plate,Group,Stat),plyr::summarise,Ref=mean(Ref))
 
-ref.rp
-
-
-head(ref.rp)
-subset(ref.rp,Replicate=='Rep5')
-
 
 refstat<-subset(summary.m, Stat=='Q90' & Metabolite %in% c('Negative Control','NGM'))
 
@@ -354,53 +284,11 @@ summary.cast<-summary.norm %>%
   merge(scores.m[,c('Replicate','Plate','Well','Score')],by=c('Replicate','Plate','Well'),all.x=TRUE)
   
 
-
-
 #Get approximate worm counts
 wormsize<-median(subset(summary.cast,N<8500)$N )
   
-  
-
-# 
-# summary.ref<-merge(summary.m,ref.rp[,c('Plate','Replicate','Group','Stat','Ref')],
-#                    by=c('Plate','Replicate','Group','Stat'),all.x=TRUE)
-# #Subtract reference measure
-# summary.ref$Norm<-summary.ref$Raw-summary.ref$Ref
-# 
-# 
-# summary.refm<-melt(summary.ref,
-#                    id.vars = c('Replicate','Plate','Well','Index','Row','Col','File','Worm','Metabolite','Metabolite_Uniq','Group','N','Stat'),
-#                    variable.name = 'Type',value.name = 'Value')
-# 
-# table(summary.refm$Replicate)
-# head(summary.refm)
-# 
-# summary.cast.t<-dcast(summary.refm,Replicate+Plate+Well+Index+Row+Col+File+Worm+Metabolite+Metabolite_Uniq+Group+N~Type+Stat,
-#                       value.var = 'Value',drop = TRUE)
-# 
-# 
-# table(summary.cast.t$Replicate)
-# 
-# summary.cast<-summary.cast.t %>%
-#   merge(scores.m[,c('Replicate','Plate','Well','Score')],by=c('Replicate','Plate','Well'),all.x=TRUE) %>%
-#   mutate(Worms=round(N/wormsize),
-#          Worms=ifelse(Worms==0,1,Worms))
-         
 
 summary.cast$UniqRep=makereplicates(summary.cast[,c('Replicate','Plate','Index')])
-
-
-
-
-
-
-min(summary.cast$Norm_Q90)
-max(summary.cast$Norm_Q90)
-
-min(summary.cast$Norm_Q90)-max(summary.cast$Norm_Q90)
-
-head(summary.m)
-
 
 
 #Worm size distribution
@@ -412,24 +300,6 @@ ggplot(summary.cast,aes(x=N))+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Worm_size_distribution.pdf",sep=''),
              width=9,height=6, useDingbats=FALSE)
-
-
-
-
-
-
-
-
-
-dim(summary.cast)
-
-head(summary.cast)
-
-
-#View(summary.cast)
-
-
-subset(summary.cast,Plate=='Controls')
 
 
 write.csv(summary.cast,paste(odir,"/Celegans_raw_summary.csv",sep=''),row.names = FALSE)
@@ -468,15 +338,6 @@ summary.sum<-summary.norm %>%
 head(summary.sum)
 
 
-# summary.sum<-ddply(summary.sel,.(Plate,Index,Metabolite,Metabolite_Uniq,Group),summarise,
-#                    Count=length(Worms),
-#                    Count_norm=sum(Worms),
-#                    Size_Mean=mean(N/Worms),
-#                    Size_SD=sd(N/Worms))
-
-
-
-
 summary.sel<-subset(summary.cast,!(Replicate=='Rep1' & (Plate=='PM1'| Plate=='PM2A'))  )
 
 lmshape.meas<-dcast(summary.sel,Replicate+UniqRep~Index,value.var = usestat)
@@ -495,23 +356,9 @@ ref.m<-merge(temp,refs[,c('Replicate','Plate','Worm','UniqRep','Group',usestat)]
 
 
 #Use NGM as reference
-# refs<-subset(summary.sel,Metabolite %in% c('NGM') )
-# ref.m<-merge(temp,refs[,c('Replicate','Worm','UniqRep',usestat)],all.x=TRUE,all.y=TRUE)
-
-
-subset(ref.m,Plate=='PM1')
-
-
 
 lmshape.ref<-dcast(ref.m,Replicate+UniqRep~Index,value.var = usestat)
 lmshape.ref$Type<-'Reference'
-dim(lmshape.ref)
-
-#View(lmshape.ref)
-
-lmshape.ref[,c('Replicate','UniqRep','Controls-A1','Controls-B1')]
-
-
 
 #Ref average = 0?
 apply(lmshape.ref[,cleanmets],2,mean,na.rm=TRUE)
@@ -521,20 +368,13 @@ apply(lmshape.ref[,cleanmets],2,mean,na.rm=TRUE)
 apply(lmshape.meas[,cleanmets],2,mean,na.rm=TRUE)
 
 
-
-
 lmshape<-rbind(lmshape.meas,lmshape.ref)
 lmshape$Type<-factor(lmshape$Type,levels=c('Reference','Measure'),labels=c('Reference','Measure'))
-
-
-
 
 allresults.t<-data.frame()
 prec<-0
 met.len<-length(cleanmets)
 
-
-#met<-'PM1_A2'
 
 for (metid in 1:length(cleanmets)) {
   met<-as.character(cleanmets[metid])
@@ -576,40 +416,17 @@ results.in<-allresults.t %>%
   dplyr::select(Plate,Well,Index,Metabolite:Metabolite_Uniq,EcoCycID:Description,logFC:p.value,FDR:logFDR_bin)
 
 
-
-
-head(summary.sum)
-
-head(results.in)
-
-dim(results.in)
-
-
-
 write.csv(results.in,paste0(odir,'/Celegans_results_withNGM.csv'),row.names = FALSE)
 
 
 
 #Continue
 
-results.in<-read.csv(paste0(odir,'/Celegans_results_withNGM.csv'))
-
-#results.in<-read.csv(paste0(odir,'/Celegans_results_against_NGM.csv'))
-
-
-
-
-
-head(results.exp)
+#results.in<-read.csv(paste0(odir,'/Celegans_results_withNGM.csv'))
 
 
 psig<-subset(results.in,FDR<0.05)
 psig[order(psig$logFC),c('Index','Metabolite_Uniq','logFC','SE','p.value','FDR','Bonferroni','Count_norm')]
-
-
-
-subset(summary.cast,Replicate=='Rep2' & Plate=='PM1' & Well=='C4')
-
 
 
 
@@ -643,76 +460,6 @@ for (plate in c('PM1','PM2A','PM3B','PM4A','Controls')) {
   print(cumdistlog)
   dev.off()
 }
-
-
-
-#Scoring plots
-
-scored<-subset(summary.cast,Replicate %in% c('Rep2','Rep3'))
-scored$Uniq_Index<-paste(scored$Replicate,scored$Index,sep='-')
-scored$Score<-as.numeric(scored$Score)
-scored$ScoreFac<-as.factor(as.character(scored$Score))
-
-
-selmets<-c('PM1-G2',
-           'PM1-B12',
-           'PM1-G12',
-           'PM1-H1',
-           'PM1-D8',
-           'PM1-F11',
-           'PM2A-A11',
-           'PM2A-B1',
-           'PM2A-B3',
-           'PM2A-B12',
-           'PM2A-H9',
-           'PM2A-E5',
-           'PM2A-E12',
-           'PM2A-H10',
-           'PM4A-A10',
-           'PM3B-D7',
-           'PM3B-A5',
-           'PM3B-E8',
-           'PM3B-C5',
-           'PM3B-F11',
-           'PM3B-H11',
-           'PM3B-A12',
-           'PM4A-G6',
-           'PM4A-H6',
-           'PM4A-E6',
-           'PM4A-A12',
-           'PM4A-H9',
-           'PM4A-H12')
-
-
-
-ggplot(scored,aes(x=Score,y=Raw_Q90))+
-  geom_boxplot(aes(group=interaction(Plate,Replicate,ScoreFac )) )+
-  geom_point()+
-  scale_x_continuous(limits=c(-1,5),breaks=seq(-5,5,by=1))+
-  #geom_text(aes(label=Well),color='gray30')+
-  # geom_text(aes(label=ifelse(Index %in% selmets,paste(as.character(Well),as.character(Metabolite),sep=' ' ),'')),
-  #           color='red',size=2,nudge_y=0.1)+
-  geom_text_repel(aes(label=ifelse(Index %in% selmets,paste(as.character(Well),as.character(Metabolite_Uniq),sep=' ' ),'')),
-                  color='red',size=2)+
-  facet_grid(Plate~Replicate)
-
-# dev.copy2pdf(device=cairo_pdf,
-#              file=paste(odir,"/Scoring_vs_Raw_Q90.pdf",sep=''),
-#              width=12,height=15)
-
-
-ggplot(scored,aes(x=Score,y=Norm_Q90))+
-  geom_point()+
-  geom_text(aes(label=Well),color='gray30',size=4,nudge_y=0.5)+
-  # geom_text_repel(aes(label=ifelse(Uniq_Index %in% selmets,as.character(Metabolite),'')),
-  #                 color='gray30')+
-  facet_grid(Plate~Replicate)
-
-
-
-
-
-
 
 
 
@@ -804,12 +551,7 @@ ggplot(results.in,aes(x=logFC))+
 
 
 #Comparisons based on brightness distribution
-
-head(data.l)
-
-
 summary<-TRUE
-
 
 
 #Normalisation for each metabolite in each worm
@@ -861,17 +603,9 @@ data.Isum<-data.n %>%
          Metabolite=as.factor(Metabolite),
          Metabolite=relevel(Metabolite,ref='Negative Control'))
 
-
-
-dim(data.Isum)
-
-
 #saveRDS(data.Isum,"Celegans_fluorescence_distributions.rds")
 
 
-
-head(data.nsum)
-#
 
 results.in[grepl('Acetoacetic',results.in$Metabolite_Uniq),]
 
@@ -971,22 +705,10 @@ data.sc<-dcast(subset(data.nsum,Measure=='Rel'),Plate+Well+Index+Metabolite+Meta
 data.sc<-subset(data.sc,Metabolite!='Negative Control')
 
 
-dim(data.sc)
-
-head(data.sc)
-
 brightsc<-setdiff(colnames(data.sc),c('Replicate','Plate','Well','Worm','Index','Metabolite','Metabolite_Uniq'))
 
-#data.sc$Sum<-apply(data.sc[, brightsc],1,sum)
-#data.sc[,brightsc]<-data.sc[,brightsc]/data.sc$Sum
-#data.sc$Index<-paste(data.sc$Plate,data.sc$Well,sep='_')
+
 rownames(data.sc)<-data.sc$Index
-
-
-head(data.sc)
-
-#data.sca<-merge(data.sc,info[,c('Plate','Well','Metabolite')],by=c('Plate','Well'))
-
 
 
 pcashape<-data.sc[,brightsc]
@@ -1091,195 +813,3 @@ dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/tSNE_by_metabolite.pdf",sep=''),
              width=15,height=15, useDingbats=FALSE)
 
-
-
-
-
-
-#install.packages('emdist')
-#library('emdist')
-
-# A <- matrix(1:6 / sum(1:6), 2)
-# B <- matrix(c(0, 0, 0, 0, 0, 1), 2)
-
-#emd2d(A, B, dist="manhattan")
-
-
-
-
-library(dplyr)
-library(reshape2)
-
-
-
-#Make distance matrix
-freq.sel<-data.f.sum[,c('Index','Metabolite','LogBrightness_sum','Mean','SD')]
-
-dim(data.f.sum)
-
-pairwise<-full_join(freq.sel,freq.sel,by=c('LogBrightness_sum'),all=TRUE)
-
-dim(pairwise)
-
-
-emds<-ddply(pairwise,.(LogBrightness_sum,Index.x,Index.y,Metabolite.x,Metabolite.y),summarise,EMD=emd2d(as.matrix(Mean.x),as.matrix(Mean.y),dist="manhattan"))
-
-emds[order(emds$EMD,decreasing = TRUE),]
-
-
-distmat<-dcast(emds,Index.x~Index.y,value.var = 'EMD')
-
-
-
-
-emds<-ddply(data.ns,.(Plate,Well,Metabolite,Group),summarise,EMD=emd2d(as.matrix(Norm),as.matrix(Ref),dist="manhattan"))
-
-emds[order(emds$EMD,decreasing = TRUE),]
-
-
-A2<-subset(data.ns,Plate=='PM1' & Well=='A2')
-
-emd2d(as.matrix(A2$Norm),as.matrix(A2$Ref))
-
-#data.sum<-ddply(data.ns,.(Plate,Well,Metabolite,LogBrightness_sum),summarise,P=sum(Rel))
-
-
-
-
-# 
-# 
-# fit<-lm(Norm_Q95~Index,summary.cast)
-# mod.results<-summary(fit)
-# 
-# allresults.comb<-as.data.frame(mod.results$coefficients)
-# allresults.comb$Index<-gsub('Index','',rownames(allresults.comb))
-# allresults.ct<-subset(allresults.comb,Index!='(Intercept)')
-# 
-# results.comb<-resultsprep(allresults.ct,info)
-# 
-# 
-# head(results.comb)
-# write.csv(results.comb,paste(odir,'/All_results_Combined_LM_Q95.csv',sep=''),row.names = FALSE)
-# 
-# subset(results.comb,Metabolite=='D-Arabinose')
-# subset(results.comb,FDR<0.05)
-# 
-# 
-# 
-# 
-# 
-# 
-# fitm<-mblm(NormQ90~Metabolite,platedata,repeated=TRUE)
-# results<-summary(fitm)
-# results
-# 
-# 
-# 
-# 
-# 
-# 
-# fit<-lm(Mean_log~Type,subset(filesummary,Supplement=='Glucose'))
-# results<-summary(fit)
-# results
-# 
-# 
-# fit<-lm(Mean_log~Type,subset(filesummary,Supplement=='L-Proline'))
-# results<-summary(fit)
-# results
-# 
-
-# cumdist<-ggplot(platedata,aes(x=Brightness,color=Replicate))+
-#   #geom_histogram(position='identity',binwidth=0.05)+
-#   stat_ecdf(aes(group=interaction(File,Replicate)))+
-#   scale_x_continuous(breaks=seq(0,1,by=0.25))+
-#   geom_vline(data=platestats,aes(group=interaction(File,Replicate),
-#                                  xintercept=Raw_Brightness_Q90),color='red')+
-#   geom_vline(data=platestats,aes(group=interaction(File,Replicate),
-#                                  xintercept=Raw_Brightness_Median),color='blue')+
-#   # geom_vline(data=platestats,aes(group=interaction(File,Replicate),
-#   #                                xintercept=BrightnessLog_Mean),color='black')+
-#   ggtitle(paste('Cumulative brightness distribution in linear scale: ',plate,sep=''),subtitle='Estimates: Q90 - red, Median - blue')+
-#   ylab('Cumulative frequency, %')+
-#   xlab('Brightness')+
-#   #geom_density() + 
-#   #stat_bin(aes(y=cumsum(..count..)),geom="line")+
-#   theme(panel.grid.major = element_blank(),
-#         panel.grid.minor = element_blank(),
-#         axis.text.x = element_text(angle = -90))+
-#   facet_grid(Row~Col)
-# 
-# fname<-paste(odir,"/Cumulative_distribution_",plate,".pdf",sep = '')
-# print(fname)
-# cairo_pdf(fname,width=12,height=6)
-# print(cumdist)
-# dev.off()
-# 
-# dist<-ggplot(platedata,aes(x=Brightness,color=Replicate))+
-#   #geom_histogram(position='identity',binwidth=0.05)+
-#   geom_density(aes(group=interaction(File,Replicate)),col=2) +
-#   scale_x_continuous(breaks=seq(0,1,by=0.25))+
-#   geom_vline(data=platestats,aes(group=interaction(File,Replicate),
-#                                  xintercept=Raw_Brightness_Q90),color='red')+
-#   geom_vline(data=platestats,aes(group=interaction(File,Replicate),
-#                                  xintercept=Raw_Brightness_Median),color='blue')+
-#   ggtitle(paste('Brightness distribution in linear scale: ',plate,sep=''),subtitle='Estimates: Q90 - red, Median - blue')+
-#   xlab('Brightness')+
-#   ylab('Frequency, %')+
-#   theme(panel.grid.major = element_blank(),
-#         panel.grid.minor = element_blank(),
-#         axis.text.x = element_text(angle = -90))+
-#   facet_grid(Row~Col)
-# 
-# fname<-paste(odir,"/Distribution_",plate,".pdf",sep = '')
-# print(fname)
-# cairo_pdf(fname,width=12,height=6)
-# print(dist)
-# dev.off()
-
-
-
-# distlog<-ggplot(platedata,aes(x=Brightness,color=Replicate))+
-#   #geom_histogram(position='identity',binwidth=0.05)+
-#   geom_density(col=2) +
-#   scale_x_continuous(breaks=seq(-5,0,by=1))+
-#   geom_vline(data=platestats,aes(xintercept=Raw_Q90,color=Replicate),linetype=1,alpha=0.5)+
-#   geom_vline(data=platestats,aes(xintercept=Raw_Median,color=Replicate),linetype=3,alpha=0.5)+
-#   ggtitle(paste('Brightness distribution in log2 scale: ',plate,sep=''),subtitle='Estimates: Q90 - solid, Median - dashed')+
-#   xlab('log2 Brightness')+
-#   ylab('Frequency, %')+
-#   theme(panel.grid.major = element_blank(),
-#         panel.grid.minor = element_blank(),
-#         axis.text.x = element_text(angle = -90))+
-#   facet_grid(Row~Col)
-# 
-# fname<-paste(odir,"/Distribution_log2_",plate,".pdf",sep = '')
-# print(fname)
-# cairo_pdf(fname,width=12,height=6)
-# print(distlog)
-# dev.off()
-# 
-# 
-# normdist<-ggplot(platestats,aes(y=Norm_Q90,x=0))+
-#   #geom_histogram(position='identity',binwidth=0.05)+
-#   #stat_summary(fun.data=MinMeanSDMMax, geom="boxplot",position = "identity") +
-#   geom_boxplot(color='gray50',width=0.5)+
-#   geom_hline(yintercept = 0,color='gray50')+
-#   geom_point(aes(color=Replicate)) +
-#   scale_y_continuous(breaks=seq(-3,3,by=1))+
-#   scale_x_continuous(breaks=c())+
-#   ylab('Normalised log2 brightness')+
-#   xlab('')+
-#   # geom_vline(data=platestats,aes(group=interaction(File,Replicate),
-#   #                                xintercept=Raw_BrightnessLog_Q90),linetype=1)+
-#   # geom_vline(data=platestats,aes(group=interaction(File,Replicate),
-#   #                                xintercept=Raw_BrightnessLog_Median),linetype=4)+
-#   ggtitle(paste('Relative fluorescence: ',plate,sep=''),
-#           subtitle='')+
-#   theme(panel.grid.major = element_blank())+
-#   facet_grid(Row~Col)
-# 
-# fname<-paste(odir,"/Normalised_distribution_log2_",plate,".pdf",sep = '')
-# print(fname)
-# cairo_pdf(fname,width=12,height=6)
-# print(normdist)
-# dev.off()

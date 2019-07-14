@@ -1,3 +1,5 @@
+# Script used for several figures. Figure numbering might have changed.
+
 library(tidyverse)
 library(PFun)
 library(broom)
@@ -8,98 +10,20 @@ scale_colour_discrete <- ggthemes::scale_colour_tableau
 scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
-
-Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+Metcols <- c("#FF0000","#32006F")
 names(Metcols) <- c("0","50")
 Metlab<-'Metformin, mM'
 
 setwd("~/Dropbox/Projects/Metformin_project/Fluorescence microscopy")
 
 
-
-
-odir<-'Summary_Fluorescence_redo'
+odir<-'Summary_Fluorescence_media'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
-#load('Fluorescence_redo.RData')
-#save.image('Fluorescence_redo.RData')
+#load('Fluorescence_media.RData')
+#save.image('Fluorescence_media.RData')
 
-translations<-c('op50-c'='OP50-C','op50-mr'='OP50-MR')
-
-#1e
-
-f1e<-read_delim('Data/redo of figures/1e_bluefluoresence.txt',delim="\t") %>%
-  gather(Condition,Abs,everything()) %>%
-  filter(!is.na(Abs)) %>%
-  mutate(Condition=str_trim(Condition)) %>%
-  separate(Condition,c("Strain","Metformin_mM"),sep = ' ') %>%
-  mutate(Strain=ifelse(Strain %in% names(translations),translations[Strain],Strain),
-         Log=log2(Abs)) 
-
-
-
-sf1e_tr<-f1e %>%
-  group_by(Strain) %>%
-  filter(!is.na(Log))%>%
-  do(tidy(lm(Log~Metformin_mM,data=.))) %>%
-  filter(term!="(Intercept)") %>%
-  mutate(Metformin_mM=str_replace(term,'Metformin_mM',''),
-         Contrast_type="Treatment",
-         term=NULL)
-
-sf1e_int<-f1e %>%
-  filter(!is.na(Log)) %>%
-  do(tidy(lm(Log~Metformin_mM*Strain,data=.))) %>%
-  filter(str_detect(term,':') & term!="(Intercept)" ) %>%
-  mutate(term=str_replace_all(term,'Metformin_mM|Strain',''),
-         Contrast_type="Interaction") %>%
-  separate(term,c('Metformin_mM','Strain'),sep=':') 
-
-sf1e<-sf1e_tr %>%
-  ungroup %>%
-  bind_rows(sf1e_int) %>%
-  select(Contrast_type,Strain,Metformin_mM,everything()) %>%
-  mutate_at(c("Metformin_mM",'Strain'),as.factor) %>%
-  mutate(Metformin_mM=factor(Metformin_mM,levels=c("0","50"),labels=c("0","50")),
-         pStars=pStars(p.value)) %>%
-  rename(SE=std.error,
-         logFC=estimate)
-
-
-sf1e %>%
-  write_csv(paste0(odir,'/1e_Blue_fluorescence_Summary.csv'))
-
-blank_data_f1e<-f1e %>%
-  group_by(Strain) %>%
-  summarise(Abs=2^(min(Log)+(max(Log)-min(Log))*1.3 ) )%>% 
-  mutate(Metformin_mM="0",
-         Metformin_mM=factor(Metformin_mM,levels=c("0","50"),labels=c("0",'50')))
-
-hj<-0.8
-vj<-2
-nx<-0#-0.25
-
-
-f1e %>%
-  ggplot(aes(x=Strain,y=Abs,color=Metformin_mM))+
-  geom_blank(data = blank_data_f1e,aes(x=Strain,y=Abs))+
-  geom_point(aes(fill=Metformin_mM),size=1,alpha=0.5,position = position_jitterdodge(dodge.width=1,jitter.width=0.4))+
-  #geom_boxplot(data=bdata,aes(ymax=Max,ymin=Min,lower=Mean-SD,upper=Mean+SD,middle=Mean),position="identity",stat = "identity",alpha=0.5)+
-  stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = position_dodge(width=1), alpha=0.5) +
-  scale_y_continuous(trans = 'log2',
-                     breaks = scales::trans_breaks('log2', function(x) 2^x),
-                     labels = scales::trans_format('log2', scales::math_format(2^.x))) + 
-  scale_colour_manual(name = "Metformin, mM",values =Metcols)+
-  scale_fill_manual(name = "Metformin, mM",values =Metcols)+
-  geom_text(data=sf1e %>% filter(Contrast_type=="Treatment"),aes(label=pStars,y=2^5.3),show.legend = FALSE,size=5)+
-  geom_text(data=sf1e %>% filter(Contrast_type=="Interaction"),aes(label=pStars,y=2^5.5),show.legend = FALSE,size=5,color="green4")+
-  ylab('Mean fluorescence per worm, a.u.')+
-  theme(legend.position="top")
-
-ggsave(file=paste0(odir,'/1e_BlueFluorescence_logScale2.pdf'),
-       width=50,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-  
+translations<-c('op50-c'='OP50-C', 'op50-mr'='OP50-MR')
 
 
 
@@ -410,13 +334,6 @@ f4<-data.frame(File=list.files("Data/redo of figures/",pattern="4e_*|s4c_*|s4f_*
   mutate(Norm=Log-mean(Log[Strain=='OP50-C' & Supplement==""])+Ref,
          NormAbs=2^Norm)
 
-unique(f4$Figure)
-unique(f4$SGroup)
-
-f4$Strain
-f4$Metformin_mM
-f4$Supplement
-
 
 sf4_T<-f4 %>%
   filter(!is.na(Norm))%>%
@@ -501,11 +418,6 @@ sf4<-sf4_T %>%
          logFC=estimate) %>%
   select(Figure,Contrast_type,Gene,Strain,SGroup,Metformin_mM,everything()) 
   
-
-sf4 %>%
-  filter(Contrast_type=="Interaction_Supplement") %>%
-  View
-
 sf4 %>%
   write_csv(paste0(odir,'/4ecf_acs-2_Supplements_Summary.csv'))
 
@@ -595,8 +507,6 @@ sf6<-f6oe %>%
          logFC=estimate) %>%
   select(Contrast_type,Strain,everything())
 
-
-sf6
 
 sf6 %>%
   write_csv(paste0(odir,'/6h_crp_oe_Summary.csv'))

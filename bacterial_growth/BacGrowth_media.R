@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(broom)
 
@@ -26,10 +27,6 @@ scale_colour_discrete <- ggthemes::scale_colour_tableau
 scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
-
-
-
-
 medias<-c('Bacto peptone','Soy peptone','LB','MRS')
 metf<-c("0","25","50","75","100","150")
 
@@ -55,8 +52,6 @@ data<-read_csv('Media growth assays/Media_data/Summary.csv') %>%
   left_join(MeasNames)
 
 
-head(data)
-
 data_ts<-read_csv('Media growth assays/Media_data/Data.csv') %>%
   filter(Data=='600nm_f' & !is.na(Media) ) %>%
   gather(Time_s,OD,contains('.0')) %>%
@@ -66,9 +61,6 @@ data_ts<-read_csv('Media growth assays/Media_data/Data.csv') %>%
          Time_h=Time_s/3600,
          Media=factor(Media,levels=medias),
          Metformin_mM=factor(Metformin_mM,levels=metf ))
-
-
-head(data_ts)
 
 
 Metcols <- colorRampPalette(c("red", "blue4"))(6)

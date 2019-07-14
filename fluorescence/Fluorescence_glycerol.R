@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 
 #devtools::install_github("PNorvaisas/PFun")
@@ -32,18 +33,6 @@ data <- read_csv('All_raw_data.csv') %>%
   mutate(SGroup=factor(SGroup,levels=Slevels,labels=Slabels),
          Strain=factor(Strain,levels=strains),
          Supplement=factor(Supplement,levels=c('None','Glycerol'),labels=c('','+ Glycerol') ))
-
-
-data %>%
-  filter(Measure=='Log') %>%
-  group_by(Type,Gene,Replicate,SGroup,Strain,Supplement,Metformin_mM) %>%
-  summarise(Count=n()) %>%
-  View()
-  
-
-unique(data$Gene)
-  
-
 
 
 
@@ -142,10 +131,6 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 
-sum.c %>%
-  filter(VarPrc>300)
-
-
 ggplot(sum.c,aes(x=Index,y=VarPrc))+
   geom_point()+
   scale_y_continuous(breaks = seq(0,1000,by=25),limits=c(0,100))+
@@ -159,7 +144,6 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 #Linear modelling
-
 
 contrasts<-read.contrasts('!Contrasts_fluorescence.xlsx')
 
@@ -183,9 +167,6 @@ results<-results.all$results
 results.castfull<-results.all$castfull
 results.cast<-results.all$cast
 results.multi<-results.all$multi
-
-head(results.castfull)
-head(results.cast)
 
 
 write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
@@ -261,9 +242,6 @@ translations<-c('F44G3.2'='argk-1','C05D11.7'='atgl-1')
 
 genes<-unique(as.character(results$Gene))
 
-
-
-
 showstats<-results %>%
   filter(Contrast %in% c('OP50_T',"glpK_T","OP50Gly_T","glpKGly_T","OP50Gly_I","gklpKGly_I"))
 
@@ -311,5 +289,3 @@ data %>%
 
 ggsave(file=paste(odir,'/Fluorescence_logScale2.pdf',sep = ''),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-

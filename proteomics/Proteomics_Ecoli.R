@@ -37,11 +37,8 @@ library(splitstackshape)
 library(qdap)
 
 
-
-## try http:// if https:// URLs are not supported
 #source("https://bioconductor.org/biocLite.R")
 #biocLite("gage")
-
 
 
 #devtools::install_github("PNorvaisas/PFun")
@@ -61,8 +58,6 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
 #load('Proteomics.RData')
-
-
 
 getinfo<-function(cof) {
   df<-data.frame(cof)
@@ -101,15 +96,10 @@ annot.raw<-rename(annot.raw,c('Spot_No'='Spot','Protein_ID'='Description'))
 
 annot<-annot.raw[,c('Spot','Uniprot','Description')]
 annot<-subset(annot,!Uniprot %in% c('NA','/'))
-dim(annot)
 
 annot$Uniprot<-as.character(annot$Uniprot)
-
-
-
 annot$Uniprot<-ifelse(annot$Uniprot=='B1XGK9','P77581',annot$Uniprot)
 
-annot
 
 
 map<-read.csv('UniProt_gene_name.txt',sep='\t')
@@ -134,34 +124,24 @@ ugroups<-unique(as.character(data$Group))
 
 
 data.annot<-colnames(data)[1:8]
-data.annot
 spots<-setdiff(colnames(data),data.annot)
-spots
 
 
 data.m<-melt(data,measure.vars = spots,variable.name = 'Spot',value.name = 'log10SA',na.rm = FALSE)
 data.m$log10SA<-ifelse(data.m$log10SA=='NaN',NA,data.m$log10SA)
-head(data.m)
-
-
 
 
 norm<-read.xlsx2('Filipe POI analysis.xlsx',sheetName='Volumes',
                     header=TRUE,endRow=19,check.names = FALSE,
                     colClasses=c(rep("character",5), rep("numeric", 313)))
-norm[,1:10]
 
 norm$Sample<-data$Sample
 
 norm.m<-melt(norm,id.vars = c('Sample','Group'),measure.vars = spots,variable.name = 'Spot',value.name = 'Volume',na.rm = FALSE)
 norm.m$Volume<-ifelse(norm.m$Volume=='NaN',NA,norm.m$Volume)
 
-head(norm.m)
 
 alldata<-merge(data.m,norm.m,by=c('Sample','Group','Spot'),all=TRUE)
-head(alldata)
-
-
 
 alldata.a<-merge(alldata,annot,by='Spot',all.x = TRUE)
 alldata.ac<-subset(alldata.a,!Uniprot %in% c(NA,'NA','/'))
@@ -184,12 +164,7 @@ alldata.as$Coef<-alldata.as$Volume/alldata.as$Mean
 
 alldata.as$log2SA<-alldata.as$log10SA/log10(2)
 
-#alldata.as$log2SA_W<-alldata.as$log2SA*alldata.as$Weight
-
 alldata.asc<-subset(alldata.as,!Uniprot %in% c(NA,'NA','/'))
-
-table(alldata.asc$Uniprot)
-
 
 #Fill data for PCA and heatmaps
 data.uni<-ddply(alldata.asc,.(Group,Uniprot),summarise,log2SA_Uni=mean(log2SA,na.rm=TRUE))
@@ -197,44 +172,21 @@ data.spot<-ddply(alldata.as,.(Group,Spot),summarise,log2SA_Spot=mean(log2SA,na.r
 
 
 alldata.fu<-merge(alldata.as,data.uni,by=c('Group','Uniprot'),all.x=TRUE)
-
 alldata.fs<-merge(alldata.fu,data.spot,by=c('Group','Spot'),all.x=TRUE)
-head(alldata.fs)
 
 alldata.fs$log2SA_F<-ifelse(is.na(alldata.fs$log2SA),alldata.fs$log2SA_Uni,alldata.fs$log2SA)
 alldata.fs$log2SA_F<-ifelse(is.na(alldata.fs$log2SA_F),alldata.fs$log2SA_Spot,alldata.fs$log2SA_F)
-head(alldata.fs)
 
-
-dim(alldata.fs)
 alldata.fsa<-merge(alldata.fs,map,by.x='Uniprot',by.y='UniProtID',all.x=TRUE)
 
-dim(alldata.fsa)
 
 
 write.csv(alldata.fsa,paste(odir,'/All_raw_data.csv',sep=''),row.names = FALSE)
 
-head(map)
-
 prot.c<-subset(alldata.fsa,!Uniprot %in% c(NA,'NA','/')) 
 
-
 prot.c$ReplicateUniq<-makereplicates(prot.c[,c("Uniprot","Gene","Group")])
-# 
-# prot.c$ReplicateUniq<-1
-# alluniq<-FALSE
-# while(!alluniq){
-#   print(max(prot.c[,'ReplicateUniq']))
-#   duplics<-duplicated(prot.c[,c("Uniprot","Gene","Group","ReplicateUniq")])
-#   alluniq<-all(duplics==FALSE)
-#   if (!alluniq) {
-#     prot.c[duplics,'ReplicateUniq']<-max(prot.c[duplics,'ReplicateUniq'])+1
-#   }
-# }
 
-subset(prot.c,Gene=='astC')
-
-dim(prot.c)
 
 #Clean data
 
@@ -253,8 +205,6 @@ rownames(metslm.f)<-metslm.f$Sample
 
 
 spots.clean<-unique(as.character(prot.c$Spot))
-
-metslm.f[,1:10]
 
 
 data.c<-data[,spots.clean]
@@ -282,29 +232,11 @@ table(miss.cols.clean)
 samples<-as.character(data$Sample)
 samples.missing<-as.character(data$Sample)[miss.rows.count>30]
 
-#samples.clean<-samples
-samples.missing
-
-
-#samples.clean<-samples
-#samples.clean<-setdiff(samples,c('C_T_1','C_T_4','R_T_3',samples.missing))
-#samples.clean<-setdiff(samples,c('C_T_1','C_T_4','R_T_3',c('C_T_3','C_C_4')))#
-
-
 samples.clean<-setdiff(samples,c('C_T_1','R_T_3'))#,'R_C_1','R_C_5'
-
-
 
 ancols<-setdiff(colnames(metslm.f),spots)
 
 metslm<-metslm.f[samples.clean,c(ancols,spots.clean)]
-
-dim(metslm)
-
-
-
-metslm[,1:10]
-
 
 #Find compounds with missing values
 miss.cols<-apply(metslm, 2, function(x) any(is.na(x)))
@@ -312,15 +244,6 @@ miss.rows<-apply(metslm, 1, function(x) any(is.na(x)))
 
 missing.cols<-names(miss.cols[miss.cols==TRUE])
 missing.rows<-rownames(metslm)[miss.rows==TRUE]
-
-missing.cols
-missing.rows
-
-# 
-# metslm[missing.rows,]
-# cleancols<-setdiff(cols,missing.cols)
-# cleanrows<-setdiff(rownames(metslm),missing.rows)
-
 
 pca.group<-metslm$Sample
 
@@ -336,8 +259,6 @@ plot(ir.pca,type='l')
 
 pcadata<-data.frame(ir.pca$x)
 pcadata[,c('Sample','Strain','Group','Metformin_mM')]<-metslm[,c('Sample','Strain','Group','Metformin_mM')]
-
-#pcadata<-merge(data.frame(ir.pca$x),metslm[,c('Sample','Strain','Metformin_mM')],by = 0)
 
 pcaresult<-summary(ir.pca)$importance
 PC1prc<-round(pcaresult['Proportion of Variance',][[1]]*100,0)
@@ -366,7 +287,6 @@ dev.copy2pdf(device=cairo_pdf,
 
 #Heatmap
 prot.cl<-subset(prot.c,Sample %in% samples.clean)
-head(prot.clean)
 
 heatshape<-dcast(prot.cl,Spot~Group+Replicate,value.var = 'log2SA_F')
 
@@ -377,10 +297,6 @@ groups<- substr(colnames(heatshape),1,nchar(colnames(heatshape))-2)
 str.tr<- matrix(unlist(strsplit(groups,'_')),2,byrow=FALSE)
 strains<-str.tr[1,]
 treat<-str.tr[2,]
-
-
-colnames(heatshape)
-groups
 
 strains.fac<-factor(strains)
 treat.fac<-factor(treat)
@@ -416,14 +332,11 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 #Use cleaned data
-#prot.clean<-subset(alldata.fs,Sample %in% samples.clean)
 
-#prot.clean<-subset(prot.c,Sample %in% samples.clean)
+prot.clean<-subset(prot.c,Sample %in% samples.clean) 
 
-prot.clean<-subset(prot.c,Sample %in% samples.clean) #,samples.missing
-
-
-ggplot(prot.clean,aes(x=log2SA,fill=Group))+geom_histogram(position='identity',alpha=0.5)
+ggplot(prot.clean,aes(x=log2SA,fill=Group))+
+  geom_histogram(position='identity',alpha=0.5)
 
 
 ggplot(prot.clean,aes(x=Gene,y=log2SA,color=Metformin_mM))+
@@ -435,7 +348,6 @@ ggplot(prot.clean,aes(x=Gene,y=log2SA,color=Metformin_mM))+
   labs(size='Weight')+
   scale_y_continuous(breaks=seq(-20,20,by=1) )+
   ylab('log 2 Standart abundance')+
-  
   theme(axis.text.x=element_text(angle=90,hjust=1))+
   facet_wrap(~Strain,labeller = labeller(Strain = label_both),ncol = 5)
 
@@ -445,7 +357,6 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 #Check
-#P36683 P37902
 
 ggplot(prot.clean,aes(x=Strain,y=log2SA,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
@@ -459,7 +370,6 @@ ggplot(prot.clean,aes(x=Strain,y=log2SA,color=Metformin_mM))+
   theme(axis.text.x=element_text(angle=90,hjust=1))+
   facet_wrap(~Gene,ncol = 5)
 
-#,labeller = labeller(Metablite = label_both)
 
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Raw_log2SA_by_Gene.pdf",sep=''),
@@ -473,8 +383,6 @@ dev.copy2pdf(device=cairo_pdf,
 summary<-ddply(prot.clean,.(Uniprot,Gene,Strain,Metformin_mM,Group),summarise,Mean=wtd.mean(log2SA,Weight,na.rm=TRUE,normwt=TRUE),SD=sqrt(wtd.var(log2SA,Weight,na.rm=TRUE,normwt = TRUE)) )
 sum.m<-melt(summary,measure.vars = c('Mean','SD'),variable.name = 'Stat',value.name = 'Value')
 
-head(sum.m)
-
 sum.m$Index<-paste(sum.m$Group,sum.m$Gene,sep=' ')
 
 
@@ -483,17 +391,13 @@ sum.c<-dcast(sum.m,Uniprot+Gene+Strain+Metformin_mM+Group+Index~Stat,value.var =
 
 sum.c$VarPrc<-(2^(sum.c$SD)-1)*100
 
-head(sum.c)
-
-#Find outliers in most variable groups
+#Find outliers in the most variable groups
 indxord<-sum.c[order(sum.c$SD),'Index']
 
 sum.c$Index<-factor(sum.c$Index,levels=indxord,labels=indxord)
 
 
 sum.c$Index[duplicated(sum.c$Index)]
-
-subset(prot.clean,Gene=='astC')
 
 
 ggplot(sum.c,aes(x=Index,y=SD))+
@@ -505,8 +409,6 @@ dev.copy2pdf(device=cairo_pdf,
              width=5,height=60, useDingbats=FALSE)
 
 
-max(sum.c$VarPrc,na.rm = TRUE)
-
 ggplot(sum.c,aes(x=Index,y=VarPrc))+
   geom_point()+
   scale_y_continuous(breaks = seq(0,150,by=25))+
@@ -516,10 +418,6 @@ ggplot(sum.c,aes(x=Index,y=VarPrc))+
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Ingroup_variation_Percentage.pdf",sep=''),
              width=5,height=60, useDingbats=FALSE)
-
-
-subset(prot.clean,Uniprot=='P76217' & Group=='R_T')
-
 
 
 
@@ -537,7 +435,6 @@ sel.groups<-as.character(unique(lmshape$Group))
 
 lmshape.ws<-ddply(lmshape.w,.(Group),function(x) apply(x[,genes],2,sum,na.rm=TRUE))
 lmshape.ws
-#lmshape.ws<-apply(lmshape.w[,genes],2,mean,na.rm=TRUE)
 
 
 lmshape.wn<-lmshape.w
@@ -557,21 +454,11 @@ strainlist<-c('OP50','OP50-MR')
 
 
 contrasts.table$Strain<-factor(contrasts.table$Strain,levels=strainlist,labels=strainlist) #
-contr.matrix
-
-dim(lmshape)
-dim(lmshape.wn)
-
-
 allresults<-hypothesise(lmshape,genes,contr.matrix,formula="0+Group",weights = lmshape.wn)
-
 
 results<-merge(allresults$All,contrasts.table[,c('Contrast','Description','Contrast_type','Strain')],by='Contrast',all.x=TRUE)
 
 results<-rename(results,c("Variable"="Gene"))
-
-head(results)
-
 
 results.a<-merge(results,map,by.x='Gene',by.y='Gene',all.x=TRUE)
 results.a<-rename(results.a,c("UniProtID"="Uniprot"))
@@ -587,55 +474,18 @@ results.a$EntrezGene<-egSYM$gene_id[mat]
 
 
 egALIAS<-toTable(org.EcK12.egALIAS2EG)
-head(egALIAS)
 dim(subset(egALIAS,is.na(gene_id) | is.na(alias_symbol)))
 mat<-match(results.a$Gene,egALIAS$alias_symbol)
 results.a$EntrezGene<-ifelse(is.na(results.a$EntrezGene),egALIAS$gene_id[mat],results.a$EntrezGene)
 
-subset(results.a,is.na(EntrezGene))
-
-#Needs to be added manually
-subset(egALIAS,grepl('tal',alias_symbol))
-
-
-
-
-
-c('galF')
-c('ECK2036')
-
-
-
-head(results.a)
-
-subset(results.a,Gene=='astC')
-
 
 results.m<-melt(results.a,measure.vars = c('logFC','p.value','SE','t.value','PE','NE','FDR','logFDR'),variable.name = 'Stat',value.name = 'Value')
-
-
-head(results.m)
 
 results.castfull<-dcast(results.m,Gene+Uniprot+EntrezGene~Contrast+Stat,value.var = 'Value')
 results.cast<-dcast(subset(results.m,Stat %in% c('logFC','FDR')),Gene+Uniprot+EntrezGene~Contrast+Stat,value.var = 'Value')
 
 
-
-head(results.castfull)
-head(results.cast)
-
-#View(results.cast)
-
-
-subset(results.cast,Gene=='astC')
-
-
-subset(results.cast,is.na(EntrezGene))
-
-
 results.exp<-results.a[,c('Contrast','Description','Contrast_type','Strain','Gene','Uniprot','logFC','FDR','p.value','SE','PE','NE','t.value')]
-
-head(results.exp)
 
 
 write.csv(results.exp,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
@@ -646,30 +496,13 @@ write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full.csv',sep='')
 write.table(results.cast,paste(odir,'/All_results_sidebyside.tsv',sep=''),
             row.names = FALSE,col.names=FALSE,sep='\t',quote = FALSE)
 
-
-head(results.cast)
-
-
-dim(subset(results.cast,`MR_C-C_C_FDR`<0.05))
-dim(subset(results.cast,`C_T-C_C_FDR`<0.05))
-
-
 contrs<-unique(as.character(results$Contrast))
 stats<-c('logFC','FDR','PE','NE')
 
 contcombs<-apply(expand.grid(contrs, stats), 1, paste, collapse="_")
-
-
-
 results.cm<-subset(results.a,Contrast=='C_T-C_C')
-
-
 results.jT<-merge(results.cm,subset(results.a,Contrast!='C_T-C_C'),by=c('Gene','Uniprot'),suffixes = c('_C',''),all.y=TRUE)
 
-
-
-
-head(results.jT)
 #Plotting starts
 
 erralpha<-0.6
@@ -783,22 +616,13 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Volcano_interaction.pdf',sep = '
              width=10,height=6,useDingbats=FALSE)
 
 
-
-
-
 #Heatmap for summary
-
-
-unique(as.character(results.a$Description))
 
 comparisons<-c("Treatment effect on OP50","Treatment effect on OP50-MR",
                "Mutant difference for OP50-MR","Interaction with treatment for OP50-MR")
 
 
 TG<-read.table('Pathway_details.txt',sep='\t',header = TRUE)
-
-
-
 
 heatsum<-dcast(results.a,Gene~Description,value.var = 'logFC')
 rownames(heatsum)<-heatsum$Gene
@@ -838,14 +662,11 @@ if (length(ordmet)!=length(unique(ordmet))){
 
 
 #By alphabet
-#ordmet<-ordmet[order(ordmet)]
-
 
 results.a$Gene<-factor(results.a$Gene,levels=ordmet,labels=ordmet)
 results.a$Description<-factor(results.a$Description,levels=comparisons,labels=comparisons)
 results.a$FDRstars<-stars.pval(results.a$FDR)
 
-#pltsel<-subset(results.a,Gene %in% TG$Gene.name)
 pltsel<-results.a
 
 ggplot(subset(pltsel,Description %in% comparisons),aes(x=Description,y=Gene ))+
@@ -872,8 +693,6 @@ dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_amp2.pdf',sep
 colnames(results.castfull)
 longevity<-subset(results.castfull,`C_T-C_C_FDR`<0.05 & `MR_T-MR_C_FDR`>0.05 & `MR_C-C_C_FDR`>0.05)$Gene
 
-longevity
-
 amp<-3
 
 ggplot(subset(results.a,Description %in% comparisons & Gene %in% longevity),aes(x=Description,y=Gene))+
@@ -896,166 +715,6 @@ dev.copy2pdf(device=cairo_pdf,file=paste0(odir,'/Comparison_heatmap_longevity.pd
              width=6,height=12,useDingbats=FALSE)
 
 
-head(results.castfull)
-
-
-#Enrichment
-
-
-annotuni<-read.csv('../Annotations/Ecoli/UniPort_GeneID_20170719.csv',header = TRUE)
-head(annotuni)
-
-head(map)
-
-
-
-prota.uc<-merge(results.castfull,annotuni[,c('b_ID','Gene_name')],by.x='Gene',by.y='Gene_name',all.x=TRUE)
-prota.uc$TvC_Rank<-ifelse(prota.uc$`C_T-C_C_logFC`<0,'-1','3')
-prota.uc$RvS_Rank<-ifelse(prota.uc$`MR_C-C_C_logFC`<0,'-1','3')
-
-
-colnames(prota.uc)
-stats<-setdiff(colnames(results.castfull),'Uniprot')
-
-
-
-stats.sel<-stats[grepl('logFC',stats)|grepl('p.value',stats)|grepl('FDR',stats)]
-
-prota.uc<-prota.uc[,c('Gene','Uniprot','b_ID','TvC_Rank','RvS_Rank',stats.sel)]
-
-write.csv(prota.uc,paste0(odir,'/Ecoli_proteomics_FBA.csv'),quote = FALSE,row.names = FALSE)
-
-
-TF<-read.csv('../Annotations/Ecoli/Transcription_Factors/network_tf_gene.txt',comment.char = '#',sep = '\t',header=FALSE)
-colnames(TF)<-c('TF','Gene','Effect','Evidence','Support','NAs')
-TF$NAs<-NULL
-
-head(TF)
-
-
-TFa<-merge(TF,prota.uc,by='Gene',all=TRUE)
-TFa<-subset(TFa,!is.na(TF))
-
-subset(TFa,Gene=='aceE')
-Gene_counts<-data.frame(table(TFa$Gene))
-Gene_counts.u<-subset(Gene_counts,Freq==1)
-
-#Is gene under single TF
-TFa$Unique<-TFa$Gene %in% Gene_counts.u$Var1
-TFa<-TFa[,c('TF','Gene','Effect','Support','Unique',stats.sel)]
-head(TFa)
-
-write.csv(TFa,paste0(odir,'/TF_gene.csv'),quote = FALSE)
-
-
-
-#TFsel<-subset(TFa,!is.na(`C_T-C_C_logFC`) &  Gene %in% TG$Gene.name)# TF %in% c('Cra','CRP','ArgR','NtrC') &
-TFsel<-subset(TFa,!is.na(`C_T-C_C_logFC`) & TF %in% c('Cra','CRP','ArgR','NtrC'))#  &
-
-TFsel
-duplicated(TFsel$TF,TFsel$Gene)
-
-
-TFsel$ReplicateUniq<-makereplicates(TFsel[,c("TF","Gene")])
-
-TFselcast<-dcast(TFsel,Gene+ReplicateUniq~TF,value.var = 'Effect')
-
-TFselcast
-
-write.csv(TFselcast,paste0(odir,'/TF_CraCRPArgRNtrC.csv'),quote = FALSE)
-
-
-#Enrichment analysis
-#TFs
-
-TFa.sel<-TFa
-#TFa.sel<-subset(TFa,Unique)
-
-length(TFa$Gene)
-length(TFa.sel$Gene)
-
-TFau<-TFa.sel[!duplicated(TFa.sel[,c('Gene','TF')]),]
-allgenes<-length(unique(TFau$Gene))
-
-head(TFau)
-
-
-TFsum<-ddply(TFau,.(TF),summarise,
-             TF_total=length(Gene),
-             TvC_sig=sum(`C_T-C_C_p.value`<0.05,na.rm = TRUE),
-             RvS_sig=sum(`MR_C-C_C_p.value`<0.05,na.rm = TRUE),
-             Longevity_sig=sum(`C_T-C_C-(MR_T-MR_C)_p.value`<0.05,na.rm = TRUE))
-
-head(TFsum)
-
-
-
-#How many significant in total
-TvC_sig_total<-length(unique(subset(TFau,`C_T-C_C_FDR`<0.05)$Gene))
-RvS_sig_total<-length(unique(subset(TFau,`MR_C-C_C_FDR`<0.05)$Gene))
-Longevity_sig_total<-length(unique(subset(TFau,`C_T-C_C-(MR_T-MR_C)_p.value`<0.05)$Gene))
-
-TFsum$TvC_total<-TvC_sig_total
-TFsum$RvS_total<-RvS_sig_total
-TFsum$Longevity_total<-Longevity_sig_total
-
-#allgenes
-#TvC_sig_total
-#RvS_sig_total
-
-TFsum$TvC_p<-phyper(TFsum$TvC_sig-1,TFsum$TvC_total,allgenes-TFsum$TvC_total,TFsum$TF_total,lower.tail =FALSE)
-TFsum$RvS_p<-phyper(TFsum$RvS_sig-1,TFsum$RvS_total,allgenes-TFsum$RvS_total,TFsum$TF_total,lower.tail = FALSE)
-TFsum$Longevity_p<-phyper(TFsum$Longevity_sig-1,TFsum$Longevity_total,allgenes-TFsum$Longevity_total,TFsum$TF_total,lower.tail = FALSE)
-
-
-TFsum$TvC_FDR<-p.adjust(TFsum$TvC_p,method='fdr')
-TFsum$RvS_FDR<-p.adjust(TFsum$RvS_p,method='fdr')
-TFsum$Longevity_FDR<-p.adjust(TFsum$Longevity_p,method='fdr')
-
-
-TFsum.n<-enrichment(TFau.c,'TF','Gene','Contrast','logFC','FDR')
-
-TFsum<-TFsum[order(TFsum$TvC_p),]
-
-
-subset(TFsum,TvC_FDR<0.05)
-
-subset(TFsum,TF=='FNR')
-TvC_sig/allgenes
-30/513
-
-
-
-TFsum<-TFsum[,c('TF','TF_total',
-                'TvC_total','RvS_total','Longevity_total',
-                'TvC_sig','RvS_sig','Longevity_sig',
-                'TvC_p','TvC_FDR',
-                'RvS_p','RvS_FDR',
-                'Longevity_p','Longevity_FDR')]
-write.csv(TFsum,paste0(odir,'/TF_enrichment.csv'))
-
-
-
-
-
-subset(TFsum,TvC_FDR<0.05)
-
-
-head(TFa)
-
-head(TFsum)
-
-
-all<-merge(TFa,TFsum,by='TF',all.x=TRUE)
-all$Evidence<-NULL
-
-write.csv(all,paste0(odir,'/TF_gene_all.csv'),quote = FALSE)
-
-TFsum[order(TFsum$TF_total,decreasing = TRUE),]
-
-
-
-
 #Ecocyc enrichment
 ecyc<-read.table('../Annotations/Ecoli/EcoCyc_Patwhays.tsv',header=TRUE,sep='\t')
 ecyc<-data.frame(splitstackshape::cSplit(ecyc,'Link',sep='='))
@@ -1066,13 +725,7 @@ ecyc<-ecyc[,-grep('Link',colnames(ecyc))]
 ecyc.m<-data.frame(splitstackshape::cSplit(ecyc,'Genes',sep=';',direction = 'long'))
 ecyc.m<-rename(ecyc.m,c('Genes'='Gene'))
 
-head(ecyc.m)
-
 ece<-merge(ecyc.m,prota.uc,by='Gene',all.x=TRUE)
-
-head(ece)
-
-
 
 
 idvariables<-c('Pathway','ID','Gene')
@@ -1080,19 +733,10 @@ selstats<-c('logFC','p.value','FDR')
 
 ece.m<-enrichment.melt(ece,idvariables,selstats)
 
-head(ece.m)
-
-#remove(enrichmentmelt)
-
 ece.en<-enrichment(ece.m,terms = c('ID','Pathway'),IDs = 'Gene',comparisons = 'Contrast',change = 'logFC',sign = 'FDR')
 
 
-head(ece.en)
-subset(ece.en,FDR<0.05)
-
 write.csv(ece.en,paste0(odir,'/EcoCyc_enrichment.csv'))
-
-
 
 
 
@@ -1112,17 +756,11 @@ gdataf<-gdata[!dupl,]
 rownames(gdataf)<-gdataf[,'EntrezGene']
 
 
-head(gdataf)
-
 allpaths<-c('00020','00010','00030','01130','00330')
 
 
 
 print(paste('Total KEGG pathways to plot:',length(allpaths)))
-
-
-max(gdataf$`C_T-C_C_logFC`)
-min(gdataf$`C_T-C_C_logFC`)
 
 
 keggdir<-paste(odir,'/KEGG',sep='')
@@ -1195,21 +833,9 @@ EC.en$Category<-'EcoCyc'
 EC.en<-rename(EC.en,c('Pathway'='Term'))
 
 
-head(TF.en)
-
-head(EC.en)
-
-head(KEGG.en)
-
 all.en<-rbind(TF.en,EC.en,KEGG.en)[,c('Category','Test','Term','p','FDR')]
 
-
-
 write.csv(all.en,paste0(odir,'/Enrichment_all_complete.csv'))
-
-
-
-View(all.en)
 
 
 all.en.all<-subset(all.en,Test=='All')
@@ -1228,7 +854,3 @@ library(grid)
 grid.table(all.en.all)
 dev.copy2pdf(device=cairo_pdf,file=paste0(odir,'/Enrichment_table.pdf'),
              width=10,height=6,useDingbats=FALSE)
-
-
-
-

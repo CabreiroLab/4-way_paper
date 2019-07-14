@@ -1,7 +1,7 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(broom)
 library(ggrepel)
-
 
 #devtools::install_github("PNorvaisas/PFun")
 library(PFun)
@@ -11,7 +11,6 @@ library(PFun)
 theme_set(theme_PN(base_size = 12))
 scale_colour_discrete <- ggthemes::scale_colour_tableau
 scale_fill_discrete <- ggthemes::scale_fill_tableau
-
 
 
 cwd<-"~/Dropbox/Projects/Metformin_project/Bacterial Growth Assays/"
@@ -65,10 +64,6 @@ data<-read_csv('Acetoacetate/Data/Summary.csv') %>%
   mutate(Value=ifelse(Value %in% c(Inf,-Inf),NA,Value ))
 
 
-data %>%
-  filter(is.infinite(Value))
-
-
 data.sum<-data %>%
   group_by(Measure,Normalisation,Strain,Metformin_mM,Acetoacetate_mM,NormName,MeasName,MeasShort) %>%
   summarise(Mean=mean(Value),
@@ -100,16 +95,6 @@ data_ts<-read_csv('Acetoacetate/Data/Data.csv') %>%
          Time_h=Time_s/3600)
 
 
-
-data_ts %>%
-  group_by(Strain,Replicate,TReplicate,Metformin_mM) %>%
-  summarise(Count=n())
-
-
-# Metcols <- colorRampPalette(c("red", "blue4"))(6)
-# names(Metcols) <- levels(data_ts$Metformin_mM)
-# Metlab<-'Metformin,\nmM'
-
 Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
 names(Metcols) <- levels(data_ts$Metformin_mM)
 Metlab<-'Metformin,\nmM'
@@ -137,7 +122,6 @@ datats.sum<-data_ts %>%
 
 
 Accols <- colorRampPalette(c("green4", "cyan"))(5)
-#Accols <- colorRampPalette(c("gray60", "cyan"))(5)
 
 names(Accols) <- levels(data_ts$Acetoacetate_mM)
 Aclab<-'Acetoacetate, mM'
@@ -234,19 +218,8 @@ stat.new<-data %>%
   lmtest("Value~Acetoacetate_mM*Metformin_mM")
 
 
-
-stat.new$Acetoacetate_mM
-stat.new$Metformin_mM
-
-# Metformin_mM=str_extract(term,'[[:digit:]]{1,3}'),
-# Metformin_mM=factor(Metformin_mM,levels=metf ),
-
-
 stat.new %>%
   write_csv(paste0(odir,"/Stats_Summary.csv"))
-
-
-#View(stat)
 
 
 stat %>%
@@ -284,14 +257,6 @@ ggsave(file=paste(odir,"/Growth_Comparison_vs_Acetoacetate0.pdf",sep=''),
              useDingbats=FALSE,scale=2,
              width=120,height=60,units='mm')
 
-
-# Straincols <- c("red","blue4", colorRampPalette(c("orange", "black"))(6))
-# Straincols <- c("red4","blue4", rainbow(6))
-# Straincols <- c("red4","blue4", terrain.colors(6))
-
-# Straincols <- c("red","blue", viridis::viridis(8,option="inferno"))
-# names(Straincols) <- strainlist
-# Strainlab<-"Strain"
 
 PlotComp<-function(data,stat,meas,measname) {
   stars<-stat %>%

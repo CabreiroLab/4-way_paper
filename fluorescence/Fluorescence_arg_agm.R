@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(scales)
 library(broom)
@@ -5,19 +6,14 @@ library(broom)
 #devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
-
-
 setwd("~/Dropbox/Projects/Metformin_project/Fluorescence microscopy/")
 
 odir<-'Summary_ArgAgmGly'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-
-
 #load("Fluorescence_ArgAgmGly.RData")
 #save.image('Fluorescence_ArgAgmGly.RData')
-
 
 
 #New default theme
@@ -45,11 +41,7 @@ removals<-c("Agm_QM_50_2_12",
 
 
 
-
-
-
 #Translations for consistency
-
 strans<-c("op50-c"="OP50-C")
 
 
@@ -90,29 +82,7 @@ data.all<-data.frame(Type=c("Agm","Arg","Gly"),File=c("Agmatine titration-OP50-C
 
 
 data.all %>%
-  filter(Type =="ArgGly") %>%
-  pull(Replicate)
-
-
-
-
-unique(data.all$ID)
-
-data.all %>%
   write_csv(paste0(odir,"/All_data_raw.csv"))
-
-View(data.all)
-
-data.all %>%
-  group_by(Type,Condition,Strain,Agmatine_mM) %>%
-  summarise(N=n()) %>%
-  View
-
-
-
-
-head(data.all)
-
 
 
 data.all %>%
@@ -130,12 +100,6 @@ data.all %>%
 
 
 
-data.all %>%
-  filter(is.na(ID))
-
-
-
-
 #Variability
 sum.c<-data.all %>%
   filter(Measure=='Log') %>%
@@ -146,10 +110,6 @@ sum.c<-data.all %>%
   arrange(VarPrc) %>%
   data.frame %>%
   mutate(Index=factor(Index, levels=Index,labels=Index))
-
-
-sum.c %>%
-  filter(VarPrc>300)
 
 
 ggplot(sum.c,aes(x=Index,y=VarPrc))+
@@ -234,9 +194,6 @@ stat.agm <- stat.agm.S %>%
 stat.agm %>%
   write_csv(paste0(odir,"/Results_Agmatine.csv"))
 
-
-View(stat.agm)
-
 sum.agm<-data.agm %>%
   group_by(Strain,Agmatine_mM) %>%
   summarise(Mean=mean(Norm),
@@ -311,12 +268,10 @@ stat.arg %>%
   write_csv(paste0(odir,"/Results_Arginine_degradation.csv"))
 
 
-
 quartz()
 #hj<-0.8
 vj<-2
 nx<--0.2
-
 
 
 data.arg %>%
@@ -332,13 +287,10 @@ data.arg %>%
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 
-
 ggsave(file=paste0(odir,"/Arginine_degradation_Summary.pdf"),
        device=cairo_pdf,family="Arial",
        scale=2,
        width=55,height=41,units='mm')
-
-
 
 
 #Glycine
@@ -360,12 +312,6 @@ stat.gly<-data.gly %>%
 
 stat.gly %>%
   write_csv(paste0(odir,"/Results_Other.csv"))
-
-
-data.gly %>%
-  View
-
-
 
 
 data.gly %>%
@@ -391,17 +337,9 @@ data.gly %>%
   geom_text(data=stat.gly,aes(label=pStars,y=2^12),show.legend = FALSE,nudge_y = -0.2,size=5,angle=45)+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
-#
 
 ggsave(file=paste0(odir,"/Other_Summary.pdf"),
        device=cairo_pdf,family="Arial",
        scale=2,
        width=55,height=41,units='mm')
-
-
-
-
-
-
-
 

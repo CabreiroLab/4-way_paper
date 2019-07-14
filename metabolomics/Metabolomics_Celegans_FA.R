@@ -1,14 +1,11 @@
+#Figure numbering might have been changed
 #Data transformation and analysis
 library(tidyverse)
 library(readxl)
-
 library(ggrepel)
 library(RColorBrewer)
-
 library(ComplexHeatmap)
 library(circlize)
-
-
 
 
 #devtools::install_github("PNorvaisas/PFun")
@@ -73,8 +70,6 @@ PCAres<-met %>%
   PCAprep("Sample","Metabolite","logConc_fill",metinfo)
 
 
-
-
 ellipses<-PCAres$Ellipses
 pcadata<-PCAres$pcadata
 PC1prc<-PCAres$PC1prc
@@ -99,11 +94,6 @@ dev.copy2pdf(device=cairo_pdf,
              width=12,height=9)
 
 
-
-
-
-
-
 #Heatmap
 heatshape<-met %>%
   filter(Strain %in%  c('OP50','OP50-MR')) %>%
@@ -115,7 +105,6 @@ heatshape<-met %>%
 
 rownames(heatshape)<-heatshape$Clean.name
 heatshape$Clean.name<-NULL
-
 
 
 #Order anotation by heatmap colnames
@@ -147,9 +136,6 @@ dev.copy2pdf(device=cairo_pdf,
              width=12,height=9, useDingbats=FALSE)
 
 
-
-
-
 ggplot(met,aes(x=`Clean name`,y=logConc,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
   stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +
@@ -179,8 +165,6 @@ dev.copy2pdf(device=cairo_pdf,
              width=25,height=10, useDingbats=FALSE)
 
 
-
-
 ggplot(met,aes(x=Strain,y=logConc,color=Metformin_mM))+
   ggtitle('Comparison between Control and Treatment. Boxplot: +/-SD, Min/Max')+
   stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity") +
@@ -198,12 +182,7 @@ dev.copy2pdf(device=cairo_pdf,
              width=20,height=20, useDingbats=FALSE)
 
 
-
-
-
 #Concentrations by groups
-
-
 
 sum.c<-met %>%
   group_by(Metabolite,`Common name`,`Clean name`,Strain,Metformin_mM,Group) %>%
@@ -233,23 +212,9 @@ dev.copy2pdf(device=cairo_pdf,
              width=7,height=30, useDingbats=FALSE)
 
 
-#Absolute concentrations over all samples
-# met.abs<-ddply(met.mes,.(Metabolite,Common.name,Clean.name,Measure),summarise,Mean=mean(Value),SD=sd(Value))
-# met.am<-melt(met.abs,measure.vars = c('Mean','SD'),variable.name = 'Stat',value.name = 'Value')
-# #Average concentration over all samples
-# met.c<-dcast(met.am,Metabolite+Common.name+Clean.name~Measure+Stat,value.var = 'Value',drop = TRUE)
-
-
-head(met.c)
-
-sel.groups<-unique(met$Group)
-sel.groups
-
-
-
 
 #Linear modelling
-
+sel.groups<-unique(met$Group)
 contrasts<-read.contrasts2('!Contrasts_Celegans_FA_metabolomics.xlsx')
 contrasts$Contrasts.table
 
@@ -280,21 +245,9 @@ write.csv(results,paste(odir,'/All_results.csv',sep=''),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/All_results_sidebyside.csv',sep=''),row.names = FALSE)
 write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full.csv',sep=''),row.names = FALSE)
 
-
-#grp.vals<-c('Metabolite','Clean name','Common name')
-
 cnt.vals<-results %>%
   select(-one_of('Metabolite','Clean name','Common name') ) %>%
   colnames(.)
-
-# results.int<-results %>%
-#   rename_(.dots = setNames(cnt.vals, paste0('x_',cnt.vals))) %>%
-#   full_join(results %>%
-#               rename_(.dots = setNames(cnt.vals, paste0('y_',cnt.vals)))) %>%
-#   full_join(results %>%
-#               rename_(.dots = setNames(cnt.vals, paste0('z_',cnt.vals)))) %>%
-#   select(Metabolite:`Clean name`,everything())
-
 
 
 #Plotting starts
@@ -447,7 +400,7 @@ results %>%
 
 
 
-dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap_Fig6.pdf',sep = ''),
+dev.copy2pdf(device=cairo_pdf,file=paste(odir,'/Comparison_heatmap.pdf',sep = ''),
              width=5,height=8,useDingbats=FALSE)
 
 

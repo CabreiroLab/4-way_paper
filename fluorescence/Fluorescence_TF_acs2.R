@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(PFun)
 library(broom)
@@ -18,10 +19,6 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 #load('Metformin_TF_acs-2.RData')
 #save.image('Metformin_TF_acs-2.RData')
-
-
-
-
 
 
 translations<-c('gvcA'='gcvA','op50-c'='OP50-C','op50'='OP50-C')
@@ -48,19 +45,6 @@ allfiles<-read_csv('TF_acs-2_segmentation/Allfiles.csv') %>%
   select(Dataset,Replicate,Type,Gene,FileNo,FileInd,Replicate_folder:File,Max) %>%
   ungroup
 
-head(allfiles)
-
-#[[:digit:]]{1,4}
-
-allfiles %>%
-  filter(Gene=='OP50-C') %>%
-  head
-
-
-
-allfiles %>%
-  filter(Dataset=='Additional') %>%
-  View()
 
 allfiles %>%
   group_by(Dataset,Replicate,Gene,Type) %>%
@@ -77,24 +61,13 @@ allfiles_sum<-allfiles %>%
   group_by(Gene) %>%
   summarise(Max=as.integer(max(Count)))
 
-allfiles_sum
-
-
 write_csv(allfiles,paste0(odir,"/Allfiles_annotated.csv"))
 write_csv(allfiles_sum,paste0(odir,'/Allfiles_summary.csv'))
 
 
-
-
 strfix<-c("op50-c"="OP50-C")
-
-
 genes<-c('OP50-C','crp','cra','argR','ntrC','arcA','csiR','fur','gcvA',"marA",'mlc',"nac")
-
 remindex<-c('1_crp_T_8')
-
-
-read_delim("TF_acs-2_segmentation/TF_acs-2_control_groups/TF acs-2 controls rep 1 23-8-17.txt",delim='\t')
 
 
 cresults<-data.frame(CFile=list.files(path = paste0("TF_acs-2_segmentation/TF_acs-2_control_groups/"))) %>%
@@ -115,12 +88,6 @@ cresults<-data.frame(CFile=list.files(path = paste0("TF_acs-2_segmentation/TF_ac
   filter(!is.na(W_Int))
   
 
-cresults %>%
-  group_by(Replicate,Dataset,Gene) %>%
-  summarise(Count=n()) %>%
-  View
-
-
 
 #Collect results
 results.o<-read_csv('TF_acs-2_segmentation/All_results_onlyprc.csv') %>%
@@ -134,8 +101,6 @@ results.a<-read_csv('TF_acs-2_segmentation/All_results_onlyprc_additional.csv') 
 
 
 results.all<-rbind(results.o,results.a)
-
-
 
 
 data<-allfiles %>%
@@ -166,46 +131,6 @@ data<-allfiles %>%
 data %>%
   write_csv(paste0(odir,"/All_data_raw.csv"))
 
-
-
-
-#NormNames<-data.frame(Normalisation=c("W_LogInt","Norm_G","Norm_M","Norm_GM"), NormName=c("Absolute","By Gene=OP50-C","By Metformin_mM=0","By Gene=OP50-C and Metformin_mM=0") )
-# data.norm<-data %>%
-#   group_by(Metformin_mM) %>%
-#   mutate(Ref_G=mean(W_LogInt[Gene=='OP50-C']) ) %>%
-#   group_by(Gene) %>%
-#   mutate(Ref_M=mean(W_LogInt[Metformin_mM=='0'])) %>%
-#   ungroup %>%
-#   mutate(Ref_GM=mean(W_LogInt[Metformin_mM=='0' & Gene=='OP50-C']),
-#          Norm_G=W_LogInt-Ref_G,
-#          Norm_M=W_LogInt-Ref_M,
-#          Norm_GM=W_LogInt-Ref_GM
-#   ) %>%
-#   ungroup %>%
-#   gather(Normalisation,Value,W_LogInt,Norm_G,Norm_M,Norm_GM) %>%
-#   left_join(NormNames) %>%
-#   mutate(Value=ifelse(Value %in% c(Inf,-Inf),NA,Value ))
-# 
-# 
-# data.norm %>%
-#   group_by(Normalisation,NormName) %>%
-#   filter(!is.na(Value))%>%
-#   do(tidy(lm(Value~Gene*Metformin_mM,data=.))) %>%
-#   rename(SE=std.error,
-#          logFC=estimate) %>%
-#   filter(term!='(Intercept)') %>%
-#   View()
-#   #filter(str_detect(term,':') ) %>%
-#   mutate(term=str_replace_all(term,'Metformin_mM|Gene',''),
-#          PE=logFC+SE,
-#          NE=logFC-SE,
-#          Prc=2^logFC*100,
-#          PrcNE=2^NE*100,
-#          PrcPE=2^PE*100,
-#          pStars=pStars(p.value)) %>%
-#   separate(term,c('Gene','Metformin_mM'),sep=':') %>%
-#   mutate_at(c("Metformin_mM",'Gene'),as.factor) %>%
-#   View()
 
 form<-"NormLog~Metformin_mM*Gene"
 
@@ -277,26 +202,6 @@ stats %>%
   write_csv(paste0(odir,"/Stats_Summary.csv"))
 
 
-
-# data %>%
-#   ggplot(aes(x=Gene,y=NormLog,color=Metformin_mM))+ #,color=Replicate
-#   geom_hline(data=CT,aes(yintercept = Ref,color=Metformin_mM))+
-#   scale_colour_manual(name = Metlab,values=Metcols)+
-#   geom_jitter(alpha=0.5) +
-#   stat_summary(fun.data=MinMeanSDMax, geom="boxplot",alpha=0.2)+
-#   scale_y_continuous(breaks=seq(-10,10))+
-#   theme(axis.text.x = element_text(angle=45,hjust=1),
-#         legend.position = "top")
-# 
-# ggsave(device=cairo_pdf,
-#        file=paste0(odir,"/Raw_T_Comparison_Log.pdf"),
-#        width=6,height=4)
-
-
-
-
-
-
 showstats<-stats %>%
   filter(Contrast_type %in% c("Gene","Interaction"))
 
@@ -304,7 +209,6 @@ CT<-data %>%
   filter(Gene=="OP50-C") %>%
   group_by(Metformin_mM) %>%
   summarise(Ref=mean(NormAbs))
-
 
 
 blank_data <- data %>%
@@ -345,11 +249,7 @@ ggsave(file=paste(odir,'/Fluorescence_logScale2.pdf',sep = ''),
        width=85,height=40,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-
 #Treatment figure:
-
-
-
 Metcols2 <- c("#32006F","#FF0000")#colorRampPalette(c("red", "blue4"))(6)
 names(Metcols2) <- c("50","0")
 Metlab2<-'Metformin,\nmM'
@@ -372,10 +272,6 @@ data %>%
   scale_fill_manual(name = Metlab2,values =Metcols2)+
   ylab('Mean fluorescence per worm, a.u.')+
   xlab('Gene')+
-  # geom_text(data=showstats %>% filter(Contrast_type=="Gene" & Metformin_mM=="50" ) ,aes(label=pStars,y=2^7.25),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
-  # geom_text(data=showstats %>% filter(Contrast_type=="Interaction"),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,color="green4",nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)+
-  # geom_text(data=showstats %>% filter(Contrast_type=="Gene"& Metformin_mM=="0") ,aes(label=pStars,y=2^4.75),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj,angle=45)+
-  #theme(legend.position="top")+
   theme(axis.text.x = element_text(angle = 45, hjust = 1),
         strip.text.y = element_blank())+
   facet_grid(Metformin_mM~.,scales = "free_y")
@@ -386,9 +282,6 @@ ggsave(file=paste(odir,'/Fluorescence_logScale2_axisbreak_Thesis.pdf',sep = ''),
 
 
 
-
-
-
 #quartz()
 data %>%
   ggplot+
@@ -396,10 +289,6 @@ data %>%
   geom_hline(data=CT,aes(yintercept = Ref,color=Metformin_mM))+
   geom_jitter(aes(fill=Metformin_mM),width=0.25,size=1,alpha=0.5)+
   stat_summary(fun.data=MinMeanSDMax, geom="boxplot",position = "identity",alpha=0.5) +#
-  #geom_blank(data = blank_data,aes(x=Gene,y=NormAbs))+
-  # scale_y_continuous(trans = 'log2',
-  #                    breaks = scales::trans_breaks('log2', function(x) 2^x),
-  #                    labels = scales::trans_format('log2', scales::math_format(2^.x))) + 
   scale_colour_manual(name = "Metformin, mM",values =Metcols)+
   scale_fill_manual(name = "Metformin, mM",values =Metcols)+
   ylab('Mean fluorescence per worm, a.u.')+
@@ -416,9 +305,6 @@ ggsave(file=paste(odir,'/Fluorescence_AbsScale_55.pdf',sep = ''),
 
 
 
-
-
-
 amp<-2
 
 minv<- -amp
@@ -430,8 +316,6 @@ nstep<-10
 clrbrks<-seq(-amp,amp,by=1)
 #patclrscale <- colorRampPalette(c("purple", "gray50","green"))(n = nstep)
 clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
-
-
 
 comps<-c("Gene 0"="0mM Metf","Gene 50"="50mM Metf","Interaction 50"="Difference")
 
@@ -477,9 +361,4 @@ stats %>%
 
 ggsave(file=paste(odir,'/Heatmap_Fluorescence_horizontal.pdf',sep = ''),
        width=55,height=31,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
-
-
-
 

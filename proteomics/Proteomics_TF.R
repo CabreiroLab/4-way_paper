@@ -15,8 +15,6 @@ library(RColorBrewer)
 library(grid)
 library(gridExtra)
 
-library(plot3D)
-
 # library(rgl)
 # library(pca3d)
 
@@ -127,10 +125,8 @@ length(intersect(prota.uc$Gene,annot$Synonym_2))
 length(intersect(prota.uc$Gene,annot$Synonym_3))
 length(intersect(prota.uc$Gene,annot$Synonym_4))
 
-prota.uc
+
 write.csv(prota.uc,'Gene_proteomics.csv',quote = FALSE,row.names = FALSE)
-
-
 
 
 
@@ -166,8 +162,6 @@ length(TFa$Gene)
 length(TFa.sel$Gene)
 
 
-
-
 TFau<-TFa.sel[!duplicated(TFa.sel[,c('Gene','TF')]),]
 
 
@@ -200,29 +194,7 @@ TvC_sig/allgenes
 TFsum<-TFsum[,c('TF','TF_total','TvC_total','RvS_total','TvC_sig','RvS_sig','TvC_p','TvC_FDR','RvS_p','RvS_FDR')]
 write.csv(TFsum,'TF_enrichment.csv')
 
-
-subset(TFsum,TvC_FDR<0.05)
-
-
 all<-merge(TFa,TFsum,by='TF',all.x=TRUE)
 all$Evidence<-NULL
 
 write.csv(all,'TF_gene_all.csv',quote = FALSE)
-
-TFsum[order(TFsum$TF_total,decreasing = TRUE),]
-
-
-subset(TFau,TF=='CRP' & TvC_ANOVA<0.05)
-
-
-
-
-subset(TFsum,TvC_p<0.05)
-
-
-subset(TFsum,RvS_p<0.05)
-
-
-
-
-

@@ -18,9 +18,6 @@ pole2<-function(x,y) {
   return(o) 
 }
 
-#theme_set(theme_Publication())
-#theme_set(theme_light())
-
 
 #New default theme
 theme_set(theme_PN(base_size = 12))
@@ -38,7 +35,6 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 #load('Biolog_combined.RData')
 #save.image('Biolog_combined.RData')
-
 
 
 lm_eqn = function(m) {
@@ -84,76 +80,13 @@ logFDRcols<-c("gray40", "red4", "red3",'red')
 
 
 #Carboxylic acids to remove
-coxy<-c('Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')#'Itaconic Acid'
+coxy<-c('Caproic Acid','Capric Acid','4-Hydroxy Benzoic Acid','2-Hydroxy Benzoic Acid')
 
 
 selmets<-info %>%
   filter(!(Plate %in% c('PM3B','PM4A') &
              Metabolite %in% PM1PM2$Metabolite ) &
            !Metabolite %in% c('Negative Control',coxy))
-
-#Do analysis on the spot
-# data<-read_csv('Data/Summary.csv') %>%
-#   filter(Plate %in% c('PM1','PM2A','PM3B','PM4A')) %>%
-#   mutate(Sample=paste(Strain,ifelse(Type=='Control','C','T'),sep='_'),
-#          SampleID=paste(Sample,Replicate,sep='_'),
-#          Sample=factor(Sample,
-#                        levels=c("OP50Sens_C","OP50Sens_T"),
-#                        labels=c("OP50Sens_C","OP50Sens_T") ) ) %>%
-#   left_join(info[,c('Index','MetaboliteU')],by='Index') %>%
-#   select(File:Metformin_mM,Replicate,Well,Index,Sample:MetaboliteU,Metabolite=Name,EcoCycID:Group,G=Int_750nm_log,GR=a_log) %>%
-#   gather(Measure,Value,G,GR) %>%
-#   group_by(Plate,Type,Replicate,Group,Measure) %>%
-#   mutate(Value_ref=Value[Metabolite=='Negative Control'],
-#          Value_norm=ifelse(Metabolite=="Negative Control",Value,Value-Value_ref)) %>%
-#   ungroup %>%
-#   mutate_at(c('SampleID','Sample','Strain','Metformin_mM'),as.factor)
-# 
-# 
-# data.nc<-data %>%
-#   filter(Plate !='PM5')
-# 
-# 
-# 
-# 
-# contrasts<-read.contrasts2('!Contrasts.xlsx')
-# 
-# contrasts.desc<-contrasts$Contrasts.table %>%
-#   select(Description:Strain)
-# 
-# contr.matrix<-contrasts$Contrasts.matrix
-# contr.matrix
-# 
-# 
-# results.all<-data.nc %>%
-#   #filter(Metabolite !="Negative Control") %>%
-#   #filter(!MetaboliteU %in% selmets$MetaboliteU) %>%
-#   group_by(Measure,Group,Plate,Well,Index,Metabolite,MetaboliteU,EcoCycID,KEGG_ID) %>%
-#   do(hypothesise2(.,'Value_norm~0+Sample',contr.matrix)) %>%
-#   getresults(contrasts.desc,c("Measure"))
-# 
-# 
-# #Separate results
-# results<-results.all$results %>%
-#   filter(Contrast!="T-C_none" ) %>% #
-#   group_by(Measure,MetaboliteU) %>%
-#   mutate(FDR=p.adjust(p.value,method = "fdr")) %>%
-#   ungroup
-#   
-#   #filter(MetaboliteU %in% selmets$MetaboliteU)
-# 
-# results %>%
-#   group_by(Measure,Contrast) %>%
-#   summarise(Total=n(),
-#             Ant=sum(logFC>0 & FDR<=0.05,na.rm=TRUE),
-#             Syn=sum(logFC<0 & FDR<=0.05,na.rm=TRUE),
-#             All=sum(FDR<=0.05,na.rm=TRUE))
-# 
-# 
-# 
-# results.eco<-results
-
-
 
 
 results.eco<-read_csv('Summary/Ecoli_results.csv')  %>%
@@ -185,27 +118,6 @@ results.cel<-read_csv('Celegans/Summary/Celegans_results_withNGM.csv') %>%
   select(Organism,Measure,Contrast,Contrast_type,Description,Index,logFC=logFCrev,SE,PE=PErev,NE=NErev,FDR) # Reverse logFC for rescue
 
 
-#select(Organism,Measure,Contrast,Contrast_type,Description,Index,MetaboliteU,EcoCycID,KEGG_ID,logFC=logFCrev,SE,PE=PErev,NE=NErev,FDR,logFDR) # Reverse logFC for rescue
-
-
-results.eco %>%
-  filter(Index=='PM4A-A2')
-
-
-results.cel %>%
-  filter(Index=='PM4A-A2')
-
-info %>%
-  filter(Index=='PM4A-A2')
-
-
-colnames(results.eco)
-colnames(results.cel)
-
-setdiff(colnames(results.cel),colnames(results.eco))
-
-setdiff(colnames(results.eco),colnames(results.cel))
-
 
 results.ecocel<-results.eco %>%
   select(-MetaboliteU) %>%
@@ -227,27 +139,10 @@ results.ecocel<-results.eco %>%
 
 
 
-
-results.ecocel %>%
-  filter(Index=='PM4A-A2')
-
-results.ecocel %>%
-  filter(Measure %in% c('G',"F") & Contrast=="T-C" & Organism=="E. coli") %>%
-  arrange(desc(logFC))
-
-
-results.ecocel %>% 
-  filter(Metabolite=='Itaconic Acid')
-
-
-
 ecocelmulti2<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU","EcoCycID","KEGG_ID"),2)
 ecocelmulti<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU","EcoCycID","KEGG_ID"),3)
 ecocelmulti4<-multiplex(results.ecocel,c("Plate","Well","Index","MetaboliteU","EcoCycID","KEGG_ID"),4)
 
-
-
-View(results.ecocel)
 
 kegg.mappings<-read_csv(paste0(odir,"/All_KEGG_mappings_Complete.csv")) %>%
   separate_rows(all.mapped) %>%
@@ -256,8 +151,6 @@ kegg.mappings<-read_csv(paste0(odir,"/All_KEGG_mappings_Complete.csv")) %>%
   summarise(Pathway_IDs=paste(unique(PathwayID),collapse = ';'),
             Pathways=paste(unique(Description),collapse = ';'))
 
-
-kegg.mappings %>% View
 
 
 all.results.KEGG<-results.ecocel %>%
@@ -282,32 +175,13 @@ all.results.sbs<-results.ecocel %>%
   select(Plate:KEGG_ID,Pathway_IDs,Pathways,EcoCyc_Instances,EcoCyc_Classes,`Ec_T-C_logFC`,`Ec_T-C_SE`,`Ec_T-C_FDR`,`Ce_T-C_logFC`,`Ce_T-C_SE`,`Ce_T-C_FDR`,Ec_C_logFC,Ec_C_SE,Ec_C_FDR,Ec_T_logFC,Ec_T_SE,Ec_T_FDR)
   
 
-glimpse(all.results.sbs)
-
 all.results.sbs %>%
   write_csv(paste0(odir,"/All_results_side_by_side_withKEGGEcoCycClass.csv")) 
 
 
 
 
-View(all.results.sbs)
-
-dim(all.results.sbs)
-
-
-
-all.results.sbs %>%
-  filter(Ec_logFC>0 & Ec_FDR<0.05 &  Ce_FDR<0.05)
-
-
-
-
-
-
-
-#For pathway
-
-
+#For pathway analysis
 amp<-2
 cbrks<-seq(-amp,amp,by=1)
 gradcols<-c('blue4','blue','gray80','red','red4')
@@ -330,10 +204,6 @@ all.results.KEGG %>%
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/PTS_Celegans_Ecoli_logFC.pdf",sep=''),
              width=5,height=10)
-
-
-
-  
 
 
 
@@ -417,10 +287,6 @@ dev.copy2pdf(device=cairo_pdf,
              width=9,height=50)
 
 
-
-
-
-head(selectcast)
 #Scatter plots
 
 lblsize<-4
@@ -455,9 +321,6 @@ thres<-0.05
 
 gradcols<-c('blue4','blue','gray80','red','red4')
 
-
-
-#showmets<-c("D-Arabinose","L-Arabinose","Acetoacetic Acid","D-Ribose","Glycerol","alpha-D-Glucose","Itaconic Acid","")
 
 
 showmets<-c('alpha-D-Glucose',
@@ -604,7 +467,7 @@ ggsave(file=paste0(odir,"/Correlations_EcT_EcC.pdf"),
 
 
 
-# Updated 3e based on nutrient groups
+# Updated based on nutrient groups
 metgroups <- c('Sign. in E. coli',
                'Sign. in C. elegans',
                'Concordant',
@@ -612,8 +475,6 @@ metgroups <- c('Sign. in E. coli',
                'N.S.')
 metcolours <- c('blue3','red3','purple3','orange2','gray70')
 
-
-#Itaconic acid, Acetoacetic acid, a-D-Glucose, D-Arabinose, Adenosine, L-serine, D-ribose and glycerol
 
 ecocelmulti2 %>%
   filter(x_OMC=="Ec_G_T-C", 
@@ -930,8 +791,6 @@ ggsave(file=paste0(odir,"/Ecoli_growth_T-C_distribution_Ce-filter.pdf"),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-
-
 #Driving effects for interaction
 
 
@@ -1009,115 +868,6 @@ ecocelmulti2 %>%
 dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Volcano_Ecoli_Growth.pdf",sep=''),
              width=12,height=9)
-
-
-
-ecocelmulti2 %>%
-  filter(x_OMC=="Ec_GR_T-C",
-         y_OMC=="Ce_F_T-C") %>%
-  ggplot(aes(x=x_logFC,y=x_logFDR,color=y_logFC))+
-  geom_hline(yintercept = -log10(0.05),color='red',alpha=0.5,linetype='longdash')+
-  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
-  geom_point(aes(size=abs(y_logFC) ))+
-  scale_colour_gradientn(colours = gradcols,
-                         breaks=cbrks,limits=c(-amp,amp),name=maincomp)+
-  labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  scale_size(range = c(0.25, 7),name=maincomp)+
-  ylab('-logFDR')+
-  xlab('Doubling rate difference (Treatment-Control), log2(OD)/h')+
-  labs(color='Significance (FDR)')
-
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Volcano_Ecoli_GrowthRate.pdf",sep=''),
-             width=12,height=9)
-
-
-
-
-#Growth rate analysis
-fit<-ecocelmulti2 %>%
-  filter(x_OMC=="Ec_GR_C",
-         y_OMC=="Ec_GR_T") %>%
-  lm(y_logFC~x_logFC,data=.)
-
-
-a<-fit$coefficients[[2]]
-b<-fit$coefficients[[1]]
-
-thres<-0.05
-
-grp<-'All'
-
-ecocelmulti %>%
-  filter(x_OMC=="Ec_GR_C",
-         y_OMC=="Ec_GR_T",
-         z_OMC=="Ce_F_T-C") %>%
-  ggplot(aes(y=y_logFC,x=x_logFC,color=z_logFC))+
-  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_abline(aes(intercept=b,slope=a),alpha=1,color='red')+
-  geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
-  geom_errorbar(aes(ymin=y_NE,ymax=y_PE),alpha=erralpha,color=errcolor,width=0)+
-  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
-  ggtitle(paste('Scatterplot of metformin and metabolite supplementation effects ',grp,sep=''),
-          subtitle = paste('Metabolites with FDR<',thres,' are marked',sep='') )+
-  geom_point(size=3)+#aes(size=abs(Cel_logFC))
-  #coord_cartesian(xlim=c(xmin,xmax),ylim = c(ymin,ymax))+
-  scale_x_continuous(breaks=seq(-10,10,by=1))+
-  scale_y_continuous(breaks=seq(-10,10,by=1))+
-  
-  xlab('Doubling rate - Control, log2(OD)/h')+
-  ylab('Doubling rate - +50mM Metformin, log2(OD)/h')+
-  #eval(parse(text = intfdr)) < thres & abs( eval(parse(text = intvar)) ) > 0.75 
-  # geom_text_repel(aes(label=ifelse(Cel_FDR<thres, as.character(Metabolite),'')),
-  #                 size=lblsize,nudge_y = 0.3,
-  #                 force=1,
-  #                 segment.colour=errcolor,
-  #                 segment.alpha =segalpha)+
-  scale_colour_gradientn(colours = gradcols,
-                         breaks=cbrks,limits=c(-amp,amp))+
-  labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  #scale_size(range = c(0.25, 7),name=maincomp)+
-  theme(panel.grid.major = element_blank(),
-        panel.grid.minor = element_blank())
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Scatter_Control-Treatment_Complete_GrowthRate_Celegans.pdf",sep=''),
-             width=13,height=9, useDingbats=FALSE)
-
-
-#Growth rate and growth
-ecocelmulti %>%
-  filter(x_OMC=="Ec_G_T-C",
-         y_OMC=="Ec_GR_T-C",
-         z_OMC=="Ce_F_T-C") %>%
-  ggplot(aes(x=x_logFC,y=y_logFC,color=z_logFC) )+
-  geom_vline(xintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  geom_hline(yintercept = 0,color='gray70',alpha=0.5,linetype='longdash')+
-  #geom_abline(aes(intercept=b,slope=a),alpha=1,color='red')+
-  #geom_abline(aes(slope=1,intercept=0),color='grey',linetype='longdash',size=0.5)+
-  geom_errorbar(aes(ymin=y_NE,ymax=y_PE),alpha=erralpha,color=errcolor,width=0)+
-  geom_errorbarh(aes(xmin=x_NE,xmax=x_PE),alpha=erralpha,color=errcolor,height=0)+
-  geom_point(aes(size=abs(z_logFC)))+
-  geom_text_repel(aes(label=ifelse(z_FDR<thres, as.character(MetaboliteU),'')),
-                  size=lblsize,nudge_y = 0.3,
-                  force=1,
-                  segment.colour=errcolor,
-                  segment.alpha =segalpha)+
-  ylab('Doubling rate difference (Treatment-Control), log2(OD)/h')+
-  xlab('Metabolite - metformin interaction as growth logFC vs NGM')+
-  scale_colour_gradientn(colours = gradcols,
-                         breaks=cbrks,limits=c(-amp,amp))+
-  labs(color='C. elegans\nphenotype rescue\n(acs-2 GFP)')+
-  scale_size(range = c(0.25, 7),name=maincomp)+
-  coord_cartesian(xlim=c(-3,3),ylim = c(-2,2))
-
-
-dev.copy2pdf(device=cairo_pdf,
-             file=paste(odir,"/Scatter_GrowthRate_vs_Growth_vs_Celegans.pdf",sep=''),
-             width=13,height=9, useDingbats=FALSE)
-
 
 
 
@@ -1280,20 +1030,6 @@ data.Isum<-readRDS('Celegans/Celegans_fluorescence_distributions.rds') %>%
   left_join(info)
 
 
-data.Isum %>%
-  filter(Index=='Controls-A1') 
-
-# indxsel<-c('PM1-A1','PM1-A2','PM4A-E6','PM1-G7') #'Controls-A1',
-# indxsel<-c('Controls-A1','PM1-A1','PM1-A2','PM1-G7','PM4A-E6')
-
-# mlevels<-c('Negative Control','L-Arabinose','Acetoacetic Acid','Phosphono Acetic Acid')
-# mlabels<-c('NGM','L-Arabinose','Acetoacetic Acid','Phosphono Acetic Acid')
-# 
-
-info %>%
-  View
-
-
 mlevels<-c('Negative Control_C',
               'alpha-D-Glucose',
               'D-Ribose',
@@ -1339,7 +1075,7 @@ indxsel<-c(indxsel,'Controls-A1')
 
 #Distributions
 
-Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
+Metcols <- c("#FF0000","#32006F")
 names(Metcols) <- c(0,50)
 Metlab<-'Metformin, mM'
 
@@ -1387,17 +1123,6 @@ res.sel<-results.in %>%
          Metformin_mM=factor(Type,levels=c("Control","Treatment"),labels=c("0","50")),
          Organism='C. elegans')
 
-
-
-
-
-
-res.sel$MetaboliteU
-res.sel$Type
-
-data.Isel$MetaboliteU
-res.sel$Metformin_mM
-data.Isel$Metformin_mM
 
 
 res.sel %>%
@@ -1449,16 +1174,6 @@ res.Ecsel<-read_csv(paste0(odir,"/Ecoli_unfiltered_results.csv")) %>%
 
 
 res.Ecsel %>%
-  filter(Metabolite=='Negative Control')
-
-res.Ecsel
-
-res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='C',]$logFC
-
-res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='C',]$logFC
-
-
-res.Ecsel %>%
   ggplot(aes(x=MetaboliteU,y=logFC,color=Metformin_mM))+
   geom_hline(aes(yintercept=res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='C',]$logFC),color='red4',linetype='longdash',alpha=0.5)+
   geom_hline(aes(yintercept=res.Ecsel[res.Ecsel$Index=='PM1-A1' & res.Ecsel$Contrast=='T',]$logFC),color='blue4',linetype='longdash',alpha=0.5)+
@@ -1503,14 +1218,6 @@ dev.copy2pdf(device=cairo_pdf,
              width=4,height=4)
 
 
-#C. elegans values
-res.sel %>%
-  filter(MetaboliteU=='NGM')
-
-
-res.Ecsel %>%
-  filter(MetaboliteU=='NGM')
-
 
 reflines<-data.frame(Organism=c("E. coli","E. coli","C. elegans","C. elegans"),
                      Metformin_mM=c(0,50,0,50),
@@ -1519,9 +1226,6 @@ reflines<-data.frame(Organism=c("E. coli","E. coli","C. elegans","C. elegans"),
 
 
 
-  
-
-colnames(res.Ecsel)
 
 #Combine two datasets
 res.comb<-res.sel.adj %>%
@@ -1531,11 +1235,6 @@ res.comb<-res.sel.adj %>%
          Organism="C. elegans") %>%
   rbind(res.Ecsel %>% select(Index,Organism,Metformin_mM,MetaboliteU,logFC,SE,NE,PE) ) %>%
   mutate(Organism=factor(Organism,levels=c("E. coli","C. elegans")))
-
-
-# Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
-# names(Metcols) <- c("0","50")
-# Metlab<-'Metformin, mM'
 
 
 res.comb %>%
@@ -1596,21 +1295,6 @@ venn.expl %>%
 
 
 
-head(venn.expl)
-venn.expl %>%
-  filter(Ec_Aggravate=='TRUE')
-
-
-
-results.ecocel %>%
-  filter(OMC=='Ec_G_T-C' & FDR<0.05 & logFC>0)
-
-results.ecocel %>%
-  filter(OMC=='Ec_G_T-C' & FDR<0.05 )
-
-
-
-
 rescue<-venn.pass %>%
   filter(OMC %in% c("Ec_G_T-C","Ce_F_T-C") & Type!="All") %>%
   unite(OT,Organism_short,Type) %>%
@@ -1620,37 +1304,6 @@ rescue<-venn.pass %>%
   unlist(recursive=FALSE)
 
 
-
-names(rescue)
-
-
-intersect(rescue[["Ce_Ant"]],rescue[["Ec_Syn"]])
-
-
-intersect(rescue[["Ce_Syn"]],rescue[["Ec_Ant"]])
-
-
-intersect(rescue[["Ce_Syn"]],rescue[["Ec_Syn"]])
-
-
-intersect(rescue[["Ce_Ant"]],rescue[["Ec_Ant"]])
-
-
-
-setdiff(rescue[["Ce_Syn"]],c(rescue[["Ec_Ant"]],rescue[["Ec_Syn"]]))
-
-
-setdiff(rescue[["Ce_Ant"]],c(rescue[["Ec_Ant"]],rescue[["Ec_Syn"]]))
-
-
-
-
-
-
-
-setdiff(Cel.rescue,EC.ant)
-
-
 vcols<-c("red","red4","blue","blue4")
 grid::grid.draw(VennDiagram::venn.diagram(rescue, col=vcols,cat.col=vcols ,NULL))
 
@@ -1658,18 +1311,6 @@ dev.copy2pdf(device=cairo_pdf,
              file=paste(odir,"/Venn_Celegans_Ecoli_updated_check.pdf",sep=''),
              width=3,height=3, useDingbats=FALSE)
 dev.off()
-
-#Additional scatter
-
-
-
-
-
-
-
-
-
-
 
 
 #EcoCyc class enrichment
@@ -1768,16 +1409,7 @@ classorder<-c("Carbohydrates","Aldehydes-Or-Ketones",
 
 
 
-#Class %in% EChm$Class & 
-
-intersect(classorder,EcoCyc.enrichment$Class)
-
-unique(EcoCyc.enrichment$Class)
-
-EcoCyc.enrichment$Class
-
-
-EcoCyc.enrichment<-read_csv(paste0(odir,'/EcoCyc_enrichment_old.csv')) %>%
+EcoCyc.enrichment<-read_csv(paste0(odir,'/EcoCyc_enrichment.csv')) %>%
   mutate(OMC=ifelse(Organism=='E. coli',"Ec_G_T-C","Ce_F_T-C"))
 
 
@@ -1793,29 +1425,6 @@ EcoCyc.enrichment %>%
   facet_grid(~Organism)+
   ylab("EcoCyc metabolite class")
 
-# dev.copy2pdf(device=cairo_pdf,file=paste0(odir,'/Enrichment_heatmap_EcoCyc_UpDown.pdf'),
-#              width=5,height=5,useDingbats=FALSE)
-
-
-
-
-# groups<-c("Organism","Organism_short","Measure","Contrast","OMC")
-# features<-c("Class","Hierarchy","NoInstances","subclasses","supclasses")
-# 
-# results.ecocel %>%
-#   left_join(pmcs %>% select(Plate,Well,Instance)) %>%
-#   right_join(ecli.co %>% filter(NoInstances>2)) %>%
-#   filter(!is.na(FDR) & !is.na(Class) ) %>%
-#   enrichment(groups,features) %>%
-#   filter(Type!="All" & OMC %in% c("Ec_G_T-C","Ce_F_T-C") ) %>%
-#   group_by(Class) %>%
-#   filter( any(FDR<0.05)) %>%
-#   ungroup %>%
-#   clustorder('Class',c("Organism","Type"),'logFDR',descending=TRUE) %>%
-#   #mutate(Class=factor(Class,levels=rev(classorder) )) %>%
-#   PlotEnrichment("Type","Class",ncols=4)+
-#   facet_grid(~Organism)+
-#   ylab("EcoCyc metabolite class")
 
 #Biolog class enrichment
 #Classes preparation
@@ -1828,18 +1437,6 @@ classes<-info %>%
 
 
 
-#phyper(q, m, n, k)
-# pop size : 5260
-# sample size : 131
-# Number of items in the pop that are classified as successes : 1998
-# Number of items in the sample that are classified as successes : 62
-#phyper(62-1, 1998, 5260-1998, 131, lower.tail=FALSE)
-
-
-
-
-# groups<-c("Organism","Organism_short","Measure","Contrast","OMC")
-# feature<-"Class"
 
 class.enrichment<-results.ecocel%>%
   left_join(classes) %>%
@@ -1878,7 +1475,7 @@ class.enrichment %>%
 #EcoCyc pathway enrichment
 
 #EcoCyc to Biolog links
-#Rocver possible links via classes
+#Rocover possible links via classes
 pmcs2<-read_csv('../Biolog/EColi_net/All_Media_Mix_clean_explicit.csv') %>%
   select(Plate,Well,EcoCycID=Instance)
 
@@ -1913,8 +1510,6 @@ EcoCycenr<-results.ecocel %>%
   enrichment(c("PID","Pathway"),featureid="EcoCycID",enrtype="regular")
 
 
-#phyper(Class_pass-1,Total_pass,Total_size-Total_pass,Class_size,lower.tail=FALSE)
-
 EcoCycenr %>%
   group_by(Organism,Measure,Contrast,Description,Type) %>%
   summarise(Count=n())
@@ -1923,11 +1518,6 @@ EcoCycenr %>%
 EcoCycenr %>%
   filter(Measure %in% c("G","F") & Contrast=="T-C" & p.value<0.05) %>%
   View
-
-# EcoCycenr %>%
-#   filter(Measure %in% c("G","F") & Contrast=="T-C" ) %>%
-#   write_csv(paste0(odir,"/EcoCyc_pathway_enrichment.csv"))
-
 
 
 #KEGG pathway enrichment
@@ -1972,17 +1562,7 @@ gdataf<-gdata[!dupl,]
 
 rownames(gdataf)<-gdataf[,"KEGG_ID"]
 
-
-
-
-# allpaths<-read_csv(paste0(odir,'/KEGG_pathways.csv')) %>%
-#   pull(PathwayID) %>%
-#   unique
-
 print(paste('Total KEGG pathways to plot:',length(allpaths)))
-
-
-#comp.gr<-'Main'
 
 library(pathview)
 
@@ -2103,90 +1683,6 @@ KEGGenrich %>%
   spread(OMCT,FDR) %>%
   select(PathwayID,Pathway,Ec_Ant,Ec_Syn,Ce_Ant,Ce_Syn) %>%
   write_csv(paste0(odir,"/KEGG_pathway_enrichment_side-by-side.csv"))
-
-
-
-
-
-#Chebi enrichment
-
-# source("https://bioconductor.org/biocLite.R")
-# biocLite('ontoCAT')
-# 
-# install.packages('ontologyIndex')
-# install.packages('ontoCAT')
-# 
-# library(ontologyIndex)
-# 
-# library(ontoCAT)
-# efo <- getEFO()
-# 
-# chebi<-getOntology('../ChEbi/chebi.obo')
-
-
-
-pmcs.c<-subset(pmcs,ChEBI_ID!='')[,c('Plate','Well','Instance','ChEBI_ID')]
-pmcs.c$fChEBI_ID<-paste0('CHEBI:',pmcs.c$ChEBI_ID)
-
-head(pmcs.c)
-
-pmcs.counts<-ddply(pmcs.c,.(Plate,Well),summarise,Count=length(ChEBI_ID))
-
-pmcs.co<-merge(pmcs.c,pmcs.counts,by=c('Plate','Well'))
-
-head(pmcs.co)
-
-
-head(encast)
-
-chedata<-merge(pmcs.co,encast,by=c('Plate','Well'))
-
-
-head(chedata)
-
-
-chedata$Ecoli_All<-ifelse(chedata$Ecoli_FDR<0.05,1/chedata$Count,0)
-chedata$Ecoli_Up<-ifelse(chedata$Ecoli_FDR<0.05 & chedata$Ecoli_logFC>0, 1/chedata$Count, 0)
-chedata$Ecoli_Down<-ifelse(chedata$Ecoli_FDR<0.05 & chedata$Ecoli_logFC<0, 1/chedata$Count, 0)
-
-
-chedata$Celegans_All<-ifelse(chedata$Celegans_FDR<0.05,1/chedata$Count,0)
-chedata$Celegans_Up<-ifelse(chedata$Celegans_FDR<0.05 & chedata$Celegans_logFC>0, 1/chedata$Count, 0)
-chedata$Celegans_Down<-ifelse(chedata$Celegans_FDR<0.05 & chedata$Celegans_logFC<0, 1/chedata$Count, 0)
-
-
-
-head(chedata)
-
-View(chedata)
-
-write.csv(chedata,paste0(odir,'/ChEBI_annotation.csv'))
-
-
-
-
-chebi<-data.frame()
-
-chfls<-list.files('Summary/ChEBI_enrichment/')
-
-for (fl in chfls) {
-  print(fl)
-  ed<-gsub('.txt','',fl,fixed = TRUE)
-  ed<-gsub('ChEBI_','',ed)
-  ce<-read.table(paste0('Summary/ChEBI_enrichment/',fl),sep='\t',header = TRUE)
-  ce$Contrast<-strsplit(ed,'_')[[1]][1]
-  ce$Type<-strsplit(ed,'_')[[1]][2]
-  chebi<-rbind(chebi,ce)
-}
-
-
-View(chebi)
-
-chebi.cast<-dcast(chebi,ChEBI_Name~Contrast+Type,value.var='Corr.PValue')
-
-
-
-
 
 
 

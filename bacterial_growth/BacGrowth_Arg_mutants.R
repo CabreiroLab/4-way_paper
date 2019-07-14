@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(broom)
 library(ggrepel)
@@ -47,12 +48,6 @@ data<-read_csv('arginine degradation mutants/Data/Summary.csv') %>%
   #left_join(NormNames) %>%
   mutate(Value=ifelse(Value %in% c(Inf,-Inf),NA,Value ))
 
-
-
-data %>%
-  filter(is.infinite(Value))
-
-
 data.sum<-data %>%
   group_by(Measure,Normalisation,Strain) %>%
   summarise(Mean=mean(Value),
@@ -79,12 +74,6 @@ data_ts<-read_csv('arginine degradation mutants/Data/Data.csv') %>%
   mutate(Strain=factor(Strain,levels=strainlist,labels=strainlabels),
          Time_s=as.numeric(Time_s),
          Time_h=Time_s/3600)
-
-
-data_ts %>%
-  group_by(Strain) %>%
-  summarise(Count=n()) %>%
-  View
 
 
 
@@ -140,10 +129,6 @@ stats<-data %>%
          pStars=pStars(p),
          Strain=factor(Strain,levels=strainlabels)) %>%
   select(Measure,Normalisation,Comparison,Strain,everything())
-
-
-
-View(stats)
 
 
 

@@ -6,14 +6,10 @@ library(circlize)
 
 #library(RColorBrewer)
 
-
-#library(limma)
-
 #devtools::install_github("PNorvaisas/PFun")
 library(PFun)
 
 theme_set(theme_Publication())
-#theme_set(theme_light())
 
 
 
@@ -66,12 +62,6 @@ data<-read_csv('Data/Summary.csv') %>%
   mutate_at(c('SampleID','Sample','Strain','Metformin_mM'),as.factor)
 
 
-data %>%
-  filter(Metabolite=="Negative Control")
-
-
-View(data)
-
 data.nc<-data %>%
   filter(Plate !='PM5')
 
@@ -87,8 +77,6 @@ bioinfo<-data.nc %>%
   data.frame
 
 rownames(bioinfo)<-bioinfo$SampleID
-
-
 
 PCAres<-PCAprep(data.nc %>% filter(Measure=="G"),"SampleID","Index","Value_norm", bioinfo )
 
@@ -157,9 +145,6 @@ contrasts.desc<-contrasts$Contrasts.table %>%
   select(Description:Strain)
 
 contr.matrix<-contrasts$Contrasts.matrix
-contr.matrix
-
-contrasts.desc
 
 
 #Carboxylic acids to remove
@@ -180,13 +165,6 @@ results.all<-data.nc %>%
 
 
 
-
-
-#Unfiltered results
-# results.all$results %>%
-#   write.csv(paste0(odir,'/Ecoli_unfiltered_results.csv'),row.names = FALSE)
-
-
 #Separate results
 results<-results.all$results %>%
   filter(MetaboliteU %in% selmets$MetaboliteU)
@@ -205,37 +183,6 @@ results.castfull<-results.all$castfull %>%
          Pole360=Pole*360)
 
 results.multi<-results.all$multi %>% filter(Measure=='G')
-
-
-
-#ncresults<-c('Negative Control','L-Arabinose','Acetoacetic Acid','Phosphono Acetic Acid')
-
-
-# oldresults<-results.all$results %>%
-#   filter(Contrast!="T-C_none" ) %>% #& Metabolite!="Negative Control"
-#   group_by(Measure,MetaboliteU) %>%
-#   mutate(FDR=p.adjust(p.value,method = "fdr"))%>%
-#   group_by(Measure,Contrast) %>%
-#   summarise(Total=n(),
-#             Ant=sum(logFC>0 & FDR<=0.05,na.rm=TRUE),
-#             Syn=sum(logFC<0 & FDR<=0.05,na.rm=TRUE),
-#             All=sum(FDR<=0.05,na.rm=TRUE))
-# 
-# oldresults %>%
-#   write_csv('~/Dropbox/Ecoli_old_results.csv')
-
-
-results %>%
-  filter(Metabolite=="Negative Control" & Measure=="G")
-
-
-results %>%
-  filter(Contrast=="T-C" & Measure=="G") %>%
-  arrange(desc(logFC)) %>%
-  select(Measure,Index,Metabolite,MetaboliteU,logFC,SE,p.value,FDR)  %>%
-  filter(Metabolite=="Negative Control") %>%
-  View()
-
 
 
 write.csv(results,paste0(odir,'/Ecoli_results.csv'),row.names = FALSE)
@@ -262,8 +209,6 @@ results.cels<-results.celr %>%
 results.castcomb<-results.castfull %>%
   left_join(results.cels) %>%
   arrange(desc(`T-C_logFC`))
-
-#View(results.castcomb)
 
 #With growth rate
 results.castcomb.c<-results.castfull.c %>%
@@ -294,14 +239,7 @@ dev.copy2pdf(device=cairo_pdf,
              width=9,height=50)
 
 
-
-
-
-#Hasn't been updated from here on
-
-
 #Generate tables for KEGG enrichment
-
 
 dir.create(paste(odir,"/Biolog_enrichment/",sep=''), showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
@@ -311,21 +249,15 @@ enrt<-subset(data.nc,Group %in% c('C-Source','N-Source','P-Source','S-Source') &
                !( Plate %in% c('PM3B','PM4A') & Name %in% PM1PM2$Name ) &
                !( Plate %in% c('PM3B','PM4A') & KEGG_ID %in% PM1PM2$KEGG_ID ) & 
                !( Plate=='PM4A' & KEGG_ID=='C00097' ) )[,c('SampleID','Sample','Plate','Index','Group','Name','KEGG_ID','Measure','Value_norm')]
-head(enrt)
 
 enrc<-dcast(enrt,SampleID+Sample+Measure~KEGG_ID,value.var = 'Value_norm')
 
-head(enrc)
 
 KEGGS<-as.character(unique(enrc$KEGG_ID))
 
 #Find duplicates
-#Works when aggregate function is length
 dKEGGS<-KEGGS[apply(enrc[,KEGGS],2, function(x) any(x>1))]
 dKEGGS
-#subset(enrs,KEGG_ID %in% dKEGGS[2])
-length(unique(enrt$KEGG_ID))
-
 
 KEGGbac<-data.frame(unique(enrt$KEGG_ID))
 

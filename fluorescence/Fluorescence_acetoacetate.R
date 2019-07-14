@@ -1,3 +1,4 @@
+#Figure numbering might have been changed
 library(tidyverse)
 library(scales)
 library(broom)
@@ -13,12 +14,8 @@ setwd("~/Dropbox/Projects/Metformin_project/Fluorescence microscopy/")
 odir<-'Summary_Acetoacetate'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
-
-
-
 #load("Fluorescence_Acetoacetate.RData")
 #save.image('Fluorescence_Acetoacetate.RData')
-
 
 
 lmtests<-function(data,form) {
@@ -86,8 +83,6 @@ scale_colour_discrete <- ggthemes::scale_colour_tableau
 scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
-
-
 data.trans<-data.frame(Gene=c("acs-2","atgl-1","cpt-2","cpt-5")) %>%
   mutate(File=paste0(Gene,'.txt')) %>%
   group_by(Gene, File) %>%
@@ -105,7 +100,6 @@ data.trans<-data.frame(Gene=c("acs-2","atgl-1","cpt-2","cpt-5")) %>%
 Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
 names(Metcols) <- c("0","50")
 Metlab<-'Metformin, mM'
-
 
 
 
@@ -131,12 +125,6 @@ blank_data<-data.trans %>%
 
 showstats<-stats %>%
   filter(Measure=="Log" )
-
-
-glimpse(data.all)
-glimpse(stats)
-
-showstats$Contrast_type
 
 
 hj<-0.8
@@ -166,9 +154,6 @@ ggsave(file=paste0(odir,'/Fluorescence_logScale2.pdf'),
        width=55,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-
-
-
 data.tit<-read_delim('./Data/acetoacetate/acs-2 titration.txt',delim='\t')%>%
   gather(Group,Abs,`0`:`20 + Met`) %>%
   filter(!is.na(Abs)) %>%
@@ -177,9 +162,6 @@ data.tit<-read_delim('./Data/acetoacetate/acs-2 titration.txt',delim='\t')%>%
          Log=log2(Abs)) %>%
   gather(Measure,Value,Abs,Log)
 
-
-data.tit %>%
-  View
 
 form<-"Value~Metformin_mM*Acetoacetate_mM"
 stats.tit<-data.tit%>%

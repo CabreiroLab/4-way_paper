@@ -1,3 +1,5 @@
+#Figure numbering might have been changed
+
 library(tidyverse)
 
 #devtools::install_github("PNorvaisas/PFun")
@@ -15,19 +17,13 @@ dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 #load("Fluorescence_Transgenes.RData")
 #save.image('Fluorescence_Transgenes.RData')
 
-
 #New default theme
 theme_set(theme_PN(base_size = 12))
 scale_colour_discrete <- ggthemes::scale_colour_tableau
 scale_fill_discrete <- ggthemes::scale_fill_tableau
 
-
-
 strains<-c('OP50-C','OP50-MR','crp','cra')
 Sstrains<-c('OP50-C','OP50-C-Glu','OP50-MR','crp','cra')
-
-
-
 
 
 data <- read_csv('All_raw_data_updated.csv') %>%
@@ -37,47 +33,9 @@ data <- read_csv('All_raw_data_updated.csv') %>%
          SGroup=factor(SGroup,levels=Sstrains))
 
 
-
-data %>%
-  filter(Measure=='Log' & Strain=="OP50-C" & Gene=='dhs-23' & Metformin_mM==50 & NormAbs<2^6)
-
-
-
-
-data %>%
-  filter(Measure=='Log' & Strain=="OP50-C" & Gene=='MGH249' )
-
-
-
-unique(data$SGroup)
-
-unique(data$Strain)
-
-
 Metcols <- c("#FF0000","#32006F")#colorRampPalette(c("red", "blue4"))(6)
 names(Metcols) <- levels(data$Metformin_mM)
 Metlab<-'Metformin,\nmM'
-
-
-
-
-# data %>%
-#   filter(Measure=='Log') %>%
-#   group_by(Type,Gene,Replicate,Strain,Supplement,Metformin_mM) %>%
-#   summarise(Count=n()) %>%
-#   View()
-  
-
-unique(data$Gene)
-  
-
-# data %>%
-#   group_by(Condition) %>%
-#   summarise %>%
-#   write_csv('Conditions_raw_transgenes.csv')
-
-
-
 
 
 
@@ -107,8 +65,6 @@ plotBoxC<-function(data,yval,ylb){
     theme(axis.text.x = element_text(angle = 90, hjust = 1))+
     facet_grid(Gene~.,scale="free_y")
 }
-
-
 
 
 Fluorplots<-data %>%
@@ -141,10 +97,6 @@ map2(paste0(odir,"/Fluorescence_norm_joined_",as.character(Fluorplots$Measure),"
      width=6,height=30, useDingbats=FALSE, ggsave)
 
 
-
-
-
-
 #
 sum.c<-data %>%
   filter(Measure=='Log') %>%
@@ -174,31 +126,14 @@ dev.copy2pdf(device=cairo_pdf,
 
 
 #Linear modelling tests
-#
-#
-# model<-lm(LogValue~0+ID, data=data)
-# lmod_glht <- multcomp::glht(model, linfct = contr.matrix)
-# result<-multcomp:::summary.glht(lmod_glht,test=multcomp::adjusted("none"))
-# res<-data.frame(result$test[c('coefficients','sigma','tstat','pvalues')])
-
 
 allgroups<-as.character(unique(data$ID))
-allgroups
 
 contrasts<-read.contrasts('!Contrasts_fluorescence.xlsx')
-
-
-
-contrasts$Contrasts.table
 contrasts.desc<-contrasts$Contrasts.table%>%
   select(Description:Metformin_mM)
 
-
 contr.matrix<-contrasts$Contrasts.matrix
-contr.matrix
-
-
-
 
 results.all<-data %>%
   filter(Measure=='Log') %>%
@@ -213,14 +148,6 @@ results.castfull<-results.all$castfull
 results.cast<-results.all$cast
 results.multi<-results.all$multi
 
-head(results.castfull)
-head(results.cast)
-
-View(results)
-
-
-
-
 write.csv(results,paste(odir,'/All_results_updated.csv',sep=''),row.names = FALSE)
 write.csv(results.cast,paste(odir,'/All_results_sidebyside_updated.csv',sep=''),row.names = FALSE)
 write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full_updated.csv',sep=''),row.names = FALSE)
@@ -232,7 +159,6 @@ write.csv(results.castfull,paste(odir,'/All_results_sidebyside_full_updated.csv'
 
 
 #Generate table for heatmap
-
 
 heatsum<-results %>%
   filter(Contrast_type %in% c('Treatment','Interaction' ) ) %>%
@@ -269,9 +195,6 @@ if (length(ordmet)!=length(unique(ordmet))){
 }
 
 
-
-
-
 results %>%
   filter(Contrast %in% c('OP50_T','OP50-MR_T','OP50-MR_I') & Gene %in% MRgene) %>%
   mutate(Gene=factor(Gene,levels=rev(MRgene) ))%>%
@@ -295,19 +218,6 @@ translations<-c('F44G3.2'='argk-1','C05D11.7'='atgl-1')
 genes<-unique(as.character(results$Gene))
 
 
-
-# RNAseq.old<-read_csv('~/Dropbox/Projects/2015-Metformin/RNAseq/Celegans_metformin/Results/All_results.csv') %>%
-#   rename(Contrast=Comparison,Gene=gene_name) %>%
-#   filter(Gene %in% c(genes,'F44G3.2','C05D11.7') & Contrast %in% c('SM-S','RM-R','SM-S-(RM-R)')) %>%
-#   select(Contrast,Gene,logFC,FDR) %>%
-#   mutate(Description=descriptions[Contrast],
-#          Type='RNAseq old',
-#          Gene=ifelse(Gene %in% names(translations),translations[Gene],Gene),
-#          Stars=pStars(FDR),
-#          logFC=ifelse(Contrast=='SM-S-(RM-R)',-logFC,logFC))
-
-
-
 RNAseq.new<-read_csv('~/Dropbox/Projects/2015-Metformin/RNAseq/Celegans_metformin/Results_1thrs_newannot/All_results.csv') %>%
   rename(Contrast=Comparison,Gene=external_gene_name) %>%
   filter(Gene %in% c(genes,'F44G3.2','C05D11.7') & Contrast %in% c('SM-S','RM-R','SM-S-(RM-R)')) %>%
@@ -318,9 +228,6 @@ RNAseq.new<-read_csv('~/Dropbox/Projects/2015-Metformin/RNAseq/Celegans_metformi
          Stars=pStars(FDR),
          logFC=ifelse(Contrast=='SM-S-(RM-R)',-logFC,logFC))
 
-
-#& Gene !='atgl-1'
-
 RNAresults<-results %>%
   filter(Contrast %in% c('OP50_T','OP50-MR_T','OP50-MR_I') ) %>%
   select(Gene, Contrast, Description,logFC,FDR,pStars) %>%
@@ -328,8 +235,6 @@ RNAresults<-results %>%
   mutate(Type='Fluorescence') %>%
   rbind(RNAseq.new) %>%
   select(Type,everything())
-
-
 
 RNAresults %>%
   write_csv(paste0(odir,'/Results_with_RNAseq.csv'))
@@ -383,7 +288,6 @@ ggsave(file=paste0(odir,'/Comparison_Heatmap_RNAseq_Fluorescence_complete_horizo
 
 #Additional fluorescence figure
 nlpgene<-base::setdiff(unique(data$Gene),RNAgenes)
-
 
 
 crpgene<-c('acs-2','atgl-1','cpt-2','cpt-5','dhs-23','MGH249')
@@ -449,13 +353,6 @@ ggsave(file=paste(odir,'/Fluorescence_logScale2_Fig2_horizontal_scaled_ncol3.pdf
        width=84,height=81,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
 
-
-
-
-
-
-
-
 selgene<-nlpgene
 
 showstats<-results %>%
@@ -497,11 +394,6 @@ data %>%
 
 ggsave(file=paste(odir,'/Fluorescence_logScale2_Fig2_nonlipid_horizontal_scaled_ncol5.pdf',sep = ''),
        width=80,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
-
-
-
 
 
 #Fig5 Transgenes
@@ -551,9 +443,6 @@ data %>%
 ggsave(file=paste(odir,'/Fluorescence_logScale2_Fig5_CRP_transgenes_updated.pdf',sep = ''),
        width=85,height=40,units='mm',scale=2,device=cairo_pdf,family="Arial")
 
-#width=62
-
-
 
 amp<-4
 
@@ -566,14 +455,6 @@ nstep<-10
 clrbrks<-seq(-amp,amp,by=1)
 #patclrscale <- colorRampPalette(c("purple", "gray50","green"))(n = nstep)
 clrscale <- colorRampPalette(c("blue4","blue", "gray90", "red","red4"))(n = nstep)
-
-
-# showstats %>%
-#   filter(Contrast_type %in% c("Treatment","Interaction")) %>%
-#   pull(logFC) %>%
-#   min
-
-
 
 labeling<-c("OP50_T"="OP50-C + 50mM Metf","CRP_T"="crp + 50mM Metf","CRP_I"="Interaction")
 
@@ -601,8 +482,6 @@ ggsave(file=paste(odir,'/Heatmap_Fluorescence_Fig5_CRP_transgenes_horizontal_upd
 
 
 quartz()
-
-
 selgene<-c("acs-2")
 selstrain<-c("OP50-C")
 
@@ -641,10 +520,6 @@ data %>%
   geom_text(data=showstats %>% filter(Contrast_type=="Interaction" ),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,color="green4",nudge_x=nx, vjust=vj,angle=45)+
   geom_text(data=showstats %>% filter(Contrast_type=="Treatment" ),aes(label=pStars,y=Inf),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)+
   theme(legend.position = "none")
-
-#+facet_wrap(~Gene,scale = "free_y",ncol=5)
-
-
 
 ggsave(file=paste(odir,'/Fluorescence_logScale2_Fig6_OP50_Glucose_tiny.pdf',sep = ''),
        width=25,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")

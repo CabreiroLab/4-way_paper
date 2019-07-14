@@ -1,3 +1,4 @@
+#Figure numbering might have been changed.
 library(tidyverse)
 library(scales)
 library(broom)
@@ -7,19 +8,14 @@ library(forcats)
 library(PFun)
 
 
-
 setwd("~/Dropbox/Projects/Metformin_project/Fluorescence microscopy/")
 
 odir<-'Summary_vha6'
 dir.create(odir, showWarnings = TRUE, recursive = FALSE, mode = "0777")
 
 
-
-
 #load("Fluorescence_vha6.RData")
 #save.image('Fluorescence_vha6.RData')
-
-
 
 lmtests<-function(data,form) {
   
@@ -86,8 +82,6 @@ scale_colour_discrete <- ggthemes::scale_colour_tableau
 scale_fill_discrete <- ggthemes::scale_fill_tableau
 
 
-
-
 data.crp<-read_delim('./Data/vha-6/pvha-6 c v crp only.txt',delim='\t') %>%
   gather(Group,Abs,c0:crp50) %>%
   filter(!is.na(Abs)) %>%
@@ -95,7 +89,6 @@ data.crp<-read_delim('./Data/vha-6/pvha-6 c v crp only.txt',delim='\t') %>%
          Strain=ifelse(str_detect(Group,"crp"),"crp","OP50-C") %>% factor(levels=c("OP50-C","crp")),
          Log=log2(Abs)) %>%
   gather(Measure,Value,Abs,Log)
-
 
 
 data.glu<-read_delim('./Data/vha-6/pvha-6 c v glucose only.txt',delim='\t') %>%
@@ -136,11 +129,6 @@ names(Metcols) <- c("0","50")
 Metlab<-'Metformin, mM'
 
 
-
-
-
-
-
 blank_data<-data.crp %>%
   filter(Measure=='Log' ) %>%
   group_by(Strain) %>%
@@ -151,13 +139,6 @@ blank_data<-data.crp %>%
 
 showstats<-stats.crp %>%
   filter(Measure=="Log" )
-
-
-glimpse(data.all)
-glimpse(stats)
-
-showstats$Contrast_type
-
 
 hj<-0.8
 vj<-2
@@ -180,13 +161,8 @@ data.crp %>%
   geom_text(data=filter(showstats,Contrast_type=="Interaction"),aes(label=pStars,y=Inf,x=Strain),show.legend = FALSE,size=5,color="green4",nudge_x=nx, vjust=vj,angle=45)+
   geom_text(data=filter(showstats,Contrast_type=="Metformin_mM"),aes(label=pStars,y=Inf,x=Strain),show.legend = FALSE,size=5,nudge_x=nx, vjust=vj+0.5,angle=45,hjust=hj)
 
-# +
-#   theme(axis.text.x = element_text(angle=45,hjust=1))
-
 ggsave(file=paste0(odir,'/Fluorescence_crp_logScale2.pdf'),
        width=50,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
 
 
 
@@ -230,10 +206,3 @@ filter(showstats,Contrast_type=="Metformin_mM")
 
 ggsave(file=paste0(odir,'/Fluorescence_Glucose_logScale2.pdf'),
        width=50,height=41,units='mm',scale=2,device=cairo_pdf,family="Arial")
-
-
-
-
-
-
-
