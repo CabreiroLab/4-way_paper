@@ -1,5 +1,5 @@
 # The 4-way paper repository
-Scripts used in the paper "Host-Microbe-Drug-Nutrient Screen Identifies Bacterial Effectors of Metformin Therapy".
+Scripts used in the article "Host-Microbe-Drug-Nutrient Screen Identifies Bacterial Effectors of Metformin Therapy".
 
 ## 4-way screen analysis (4-way_screen/)
 - **Biolog_analysis_NGM_Ecoli.R** - 4-way screen analysis for *E. coli* (Fig. 1, S1)
